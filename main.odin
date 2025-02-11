@@ -34,12 +34,13 @@ Vertex_Data :: struct{
 	uv: Vec2,
 }
 
-// Handle multible objects
+// Handle multiple objects
 Object :: struct{
 	pos: Vec3,
 	rot: Vec3,
 	img: sg.Image,
 	vertex_buffer: sg.Buffer,
+	id: cstring,
 
 }
 
@@ -143,7 +144,7 @@ init_cb :: proc "c" (){
 		data = sg_range(indices),
 	})
 
-	create_sprite("./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG", {0, 0}, {2, 2})
+	create_sprite("./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG", {0, 0}, {2, 2}, "hello")
 
 	//create the sampler
 	g.sampler = sg.make_sampler({})
@@ -219,6 +220,8 @@ frame_cb :: proc "c" (){
 	// g.rotation.x += linalg.to_radians(ROTATION_SPEED * dt)
 	// g.rotation.y += linalg.to_radians(ROTATION_SPEED * dt)
 	// g.rotation.z += linalg.to_radians(ROTATION_SPEED * dt)
+
+	update_sprite({g.rotation.x, 0}, {0, 0, g.rotation.y}, "hello")
 
 	//  projection matrix(turns normal coords to screen coords)
 	p := linalg.matrix4_perspective_f32(70, sapp.widthf() / sapp.heightf(), 0.0001, 1000)
@@ -333,7 +336,7 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 }
 
 //proc for creating a new sprite on the screen and drawing it every frame
-create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2){
+create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
 	WHITE :: sg.Color { 1,1,1,1 }
 
@@ -352,5 +355,22 @@ create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2){
 		{0, 0, 0},
 		load_image(filename),
 		sg.make_buffer({ data = sg_range(vertices)}),
+		id
 	})
+}
+
+//proc for updating sprite
+update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
+
+	WHITE :: sg.Color { 1,1,1,1 }
+
+
+
+
+	for &i in g.objects{
+		if i.id == id{
+			i.pos = {pos2.x, pos2.y, 0}
+			i.rot = {rot3.x, rot3.y, rot3.z}
+		}
+	}
 }
