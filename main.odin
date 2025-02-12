@@ -306,10 +306,10 @@ update_player :: proc(dt: f32) {
 
 	motion := linalg.normalize0(move_dir) * MOVE_SPEED * dt
 
-	rotation := Vec2{0, 0}//math.atan(motion)
+	rotation := math.atan(motion.y/motion.x)
 
 	g.player.pos += motion
-	update_sprite(g.player.pos, {rotation.x, rotation.y, 0}, g.player.id)
+	update_sprite(g.player.pos, {0, 0, 0}, g.player.id)
 }
 
 //function for moving around camera
