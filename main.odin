@@ -44,6 +44,15 @@ Object :: struct{
 
 }
 
+Player :: struct{
+	id: cstring,
+	sprite: cstring,
+	pos: Vec2,
+	size: Vec2,
+}
+
+
+
 //global vars
 Globals :: struct {
 	should_quit: bool,
@@ -57,7 +66,8 @@ Globals :: struct {
 		position: Vec3,
 		target: Vec3,
 		look: Vec2,
-	}
+	},
+	player: Player,
 }
 g: ^Globals
 
@@ -98,9 +108,18 @@ init_cb :: proc "c" (){
 	//lock mouse and hide mouse
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
+	sapp.toggle_fullscreen()
 
 	//the globals
 	g = new(Globals)
+
+	// setup the player
+	g.player = Player{
+		"Player",
+		"./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
+		{0, 0},
+		{0.7, 0.7},
+	}
 
 	//setup the camera
 	g.camera = {
@@ -144,7 +163,7 @@ init_cb :: proc "c" (){
 		data = sg_range(indices),
 	})
 
-	create_sprite("./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG", {0, 0}, {2, 2}, "hello")
+	create_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
 	//create the sampler
 	g.sampler = sg.make_sampler({})
@@ -208,7 +227,7 @@ frame_cb :: proc "c" (){
 
 	//exit the program
 	if(g.should_quit){
-		sapp.quit()
+		quit_game()
 		return
 	}
 
@@ -216,6 +235,8 @@ frame_cb :: proc "c" (){
 	dt := f32(sapp.frame_duration())
 
 	// update_camera(dt)
+	
+	update_player(dt)
 
 	// g.rotation.x += linalg.to_radians(ROTATION_SPEED * dt)
 	// g.rotation.y += linalg.to_radians(ROTATION_SPEED * dt)
@@ -270,6 +291,26 @@ MOVE_SPEED :: 3
 LOOK_SENSITIVITY :: 0.3
 
 //function for moving around camera
+update_player :: proc(dt: f32) {
+	move_input: Vec2
+	if key_down[.W] do move_input.y = 1
+	else if key_down[.S] do move_input.y = -1
+	if key_down[.A] do move_input.x = -1
+	else if key_down[.D] do move_input.x = 1
+
+	up := Vec2{0,1}
+	right := Vec2{1,0}
+
+
+	move_dir := up * move_input.y + right * move_input.x
+
+	motion := linalg.normalize0(move_dir) * MOVE_SPEED * dt
+
+	g.player.pos += motion
+	update_sprite(g.player.pos, {0, 0, 0}, g.player.id)
+}
+
+//function for moving around camera
 update_camera :: proc(dt: f32) {
 	move_input: Vec2
 	if key_down[.W] do move_input.y = 1
@@ -295,6 +336,7 @@ update_camera :: proc(dt: f32) {
 	g.camera.target = g.camera.position + forward
 }
 
+//var for mouse movement
 mouse_move: Vec2
 
 //stores the states for all keys
@@ -373,4 +415,9 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 			i.rot = {rot3.x, rot3.y, rot3.z}
 		}
 	}
+}
+
+//proc for quiting the game
+quit_game :: proc(){
+	sapp.quit()
 }
