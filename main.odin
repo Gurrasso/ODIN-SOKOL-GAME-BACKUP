@@ -236,9 +236,11 @@ frame_cb :: proc "c" (){
 	//deltatime
 	dt := f32(sapp.frame_duration())
 
-	// update_camera(dt)
+	//update_camera(dt)
 	
 	update_player(dt)
+
+	//camera_follow(g.player.pos)
 
 	// g.rotation.x += linalg.to_radians(ROTATION_SPEED * dt)
 	// g.rotation.y += linalg.to_radians(ROTATION_SPEED * dt)
@@ -292,6 +294,7 @@ frame_cb :: proc "c" (){
 MOVE_SPEED :: 5
 LOOK_SENSITIVITY :: 0.3
 
+//check the player collision
 check_collision :: proc (){
 
 	wierd_const :: 7.6
@@ -340,6 +343,11 @@ update_player :: proc(dt: f32) {
 
 	g.player.pos += motion
 	update_sprite(g.player.pos, {0, 0, g.player.rot}, g.player.id)
+}
+
+camera_follow :: proc(position: Vec2) {
+	g.camera.position = {position.x, position.y, g.camera.position.z}
+	g.camera.target = {position.x, position.y, g.camera.target.z}
 }
 
 //function for moving around camera
@@ -437,10 +445,6 @@ create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
 //proc for updating sprites
 update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
-
-
-
-	//
 	for &i in g.objects{
 		if i.id == id{
 			i.pos = {pos2.x, pos2.y, 0}
