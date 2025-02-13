@@ -49,6 +49,7 @@ Player :: struct{
 	sprite: cstring,
 	pos: Vec2,
 	size: Vec2,
+	rot: f32,
 }
 
 
@@ -81,7 +82,7 @@ main :: proc(){
 	//sokol app
 	sapp.run({
 		width = 800,
-		height = 600,
+		height = 800,
 		window_title = "ODIN-SOKOL-GAME",
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
@@ -118,13 +119,14 @@ init_cb :: proc "c" (){
 		"Player",
 		"./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
 		{0, 0},
-		{0.7, 0.7},
+		{1, 1},
+		0,
 	}
 
 	//setup the camera
 	g.camera = {
 		position = { 0,0,8 },
-		target = { 0,0,1 },
+		target = { 0,0,-1 },
 	}
 	
 	//make the shader and pipeline
@@ -287,8 +289,30 @@ frame_cb :: proc "c" (){
 	mouse_move = {}
 }
 
-MOVE_SPEED :: 3
+MOVE_SPEED :: 5
 LOOK_SENSITIVITY :: 0.3
+
+check_collision :: proc (){
+
+	wierd_const :: 7.6
+	collision_offset := Vec2 {g.player.size.x/2, g.player.size.y/2}
+	screen_size_from_origin := Vec2 {sapp.widthf()/2, sapp.heightf()/2}
+	pixels_per_coord: f32 = sapp.heightf()/wierd_const
+
+
+
+	if g.player.pos.y + collision_offset.y > screen_size_from_origin.y/ pixels_per_coord{
+		g.player.pos.y = (screen_size_from_origin.y / pixels_per_coord) - collision_offset.y
+	} else if g.player.pos.y - collision_offset.y < -(screen_size_from_origin.y / pixels_per_coord){
+		g.player.pos.y = -screen_size_from_origin.y / pixels_per_coord + collision_offset.y
+	}
+	if g.player.pos.x + collision_offset.x > screen_size_from_origin.x/ pixels_per_coord{
+		g.player.pos.x = (screen_size_from_origin.x / pixels_per_coord) - collision_offset.x
+	} else if g.player.pos.x - collision_offset.x < -(screen_size_from_origin.x/ pixels_per_coord){
+		g.player.pos.x = -screen_size_from_origin.x / pixels_per_coord + collision_offset.x
+	}
+}
+
 
 //function for moving around camera
 update_player :: proc(dt: f32) {
@@ -306,10 +330,16 @@ update_player :: proc(dt: f32) {
 
 	motion := linalg.normalize0(move_dir) * MOVE_SPEED * dt
 
-	rotation := math.atan(motion.y/motion.x)
+	//creates a player rotation based of the movement
+	if move_dir != 0 {
+		g.player.rot = linalg.to_degrees(math.atan(motion.y/motion.x))
+	}
+
+	check_collision()
+
 
 	g.player.pos += motion
-	update_sprite(g.player.pos, {0, 0, 0}, g.player.id)
+	update_sprite(g.player.pos, {0, 0, g.player.rot}, g.player.id)
 }
 
 //function for moving around camera
@@ -382,6 +412,8 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 //proc for creating a new sprite on the screen and drawing it every frame
 create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
+
+	//color offset
 	WHITE :: sg.Color { 1,1,1,1 }
 
 
@@ -403,14 +435,12 @@ create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 	})
 }
 
-//proc for updating sprite
+//proc for updating sprites
 update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 
-	WHITE :: sg.Color { 1,1,1,1 }
 
 
-
-
+	//
 	for &i in g.objects{
 		if i.id == id{
 			i.pos = {pos2.x, pos2.y, 0}
