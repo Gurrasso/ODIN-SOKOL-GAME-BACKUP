@@ -2,7 +2,9 @@
 package main
 
 
-//   imports
+/* 
+	IMPORTS
+ */
 import "base:intrinsics"
 import "base:runtime"
 import "core:log"
@@ -14,6 +16,7 @@ import stbi "vendor:stb/image"
 import sapp "./sokol/app"
 import shelpers "./sokol/helpers"
 import sg "./sokol/gfx"
+import sglue "./sokol/glue"
 
 //shortening of linalg.to_radians
 to_radians :: linalg.to_radians
@@ -87,6 +90,7 @@ main :: proc(){
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
+		icon = { sokol_default = true },
 
 		init_cb = init_cb,
 		frame_cb = frame_cb,
@@ -109,18 +113,18 @@ init_cb :: proc "c" (){
 	//lock mouse and hide mouse
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
-	sapp.toggle_fullscreen()
+	//sapp.toggle_fullscreen()
 
 	//the globals
 	g = new(Globals)
 
 	// setup the player
 	g.player = Player{
-		"Player",
-		"./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
-		{0, 0},
-		{1, 1},
-		0,
+		id = "Player",
+		sprite = "./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
+		pos = {0, 0},
+		size ={1, 1},
+		rot = 0,
 	}
 
 	//setup the camera
@@ -457,3 +461,4 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 quit_game :: proc(){
 	sapp.quit()
 }
+
