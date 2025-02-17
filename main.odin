@@ -2,16 +2,17 @@
 package main
 
 
-/* 
-	IMPORTS
- */
+// 
+//  IMPORTS
+//
 import "base:intrinsics"
 import "base:runtime"
 import "core:log"
 import "core:math"
 import "core:math/linalg"
-// stb images
+// stb
 import stbi "vendor:stb/image"
+import stbtt "vendor:stb/truetype"
 // sokol imports
 import sapp "./sokol/app"
 import shelpers "./sokol/helpers"
@@ -84,8 +85,8 @@ main :: proc(){
 
 	//sokol app
 	sapp.run({
-		width = 800,
-		height = 800,
+		width = 1000,
+		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
@@ -110,29 +111,11 @@ init_cb :: proc "c" (){
 		logger = sg.Logger(shelpers.logger(&default_context)),
 	})
 
-	//lock mouse and hide mouse
-	sapp.show_mouse(false)
-	sapp.lock_mouse(true)
-	//sapp.toggle_fullscreen()
-
 	//the globals
 	g = new(Globals)
 
-	// setup the player
-	g.player = Player{
-		id = "Player",
-		sprite = "./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
-		pos = {0, 0},
-		size ={1, 1},
-		rot = 0,
-	}
-
-	//setup the camera
-	g.camera = {
-		position = { 0,0,8 },
-		target = { 0,0,-1 },
-	}
-	
+	init_game_state()
+		
 	//make the shader and pipeline
 	g.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
 	g.pipeline = sg.make_pipeline({
@@ -240,17 +223,7 @@ frame_cb :: proc "c" (){
 	//deltatime
 	dt := f32(sapp.frame_duration())
 
-	//update_camera(dt)
-	
-	update_player(dt)
-
-	//camera_follow(g.player.pos)
-
-	// g.rotation.x += linalg.to_radians(ROTATION_SPEED * dt)
-	// g.rotation.y += linalg.to_radians(ROTATION_SPEED * dt)
-	// g.rotation.z += linalg.to_radians(ROTATION_SPEED * dt)
-
-	update_sprite({g.rotation.x, 0}, {0, 0, g.rotation.y}, "hello")
+	update_game_state(dt)
 
 	//  projection matrix(turns normal coords to screen coords)
 	p := linalg.matrix4_perspective_f32(70, sapp.widthf() / sapp.heightf(), 0.0001, 1000)
@@ -460,5 +433,33 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 //proc for quiting the game
 quit_game :: proc(){
 	sapp.quit()
+}
+
+init_game_state :: proc(){
+
+	sapp.show_mouse(false)
+	sapp.lock_mouse(true)
+	//sapp.toggle_fullscreen()
+
+	// setup the player
+	g.player = Player{
+		id = "Player",
+		sprite = "./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
+		pos = {0, 0},
+		size ={1, 1},
+		rot = 0,
+	}
+
+	//setup the camera
+	g.camera = {
+		position = { 0,0,8 },
+		target = { 0,0,-1 },
+	}
+}
+
+update_game_state :: proc(dt: f32){
+	//update_camera(dt)
+	update_player(dt)
+	//camera_follow(g.player.pos)
 }
 
