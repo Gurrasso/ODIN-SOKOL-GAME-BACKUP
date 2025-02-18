@@ -10,6 +10,8 @@ import "base:runtime"
 import "core:log"
 import "core:math"
 import "core:math/linalg"
+import "core:mem"
+import "core:os"
 // stb
 import stbi "vendor:stb/image"
 import stbtt "vendor:stb/truetype"
@@ -19,8 +21,8 @@ import shelpers "./sokol/helpers"
 import sg "./sokol/gfx"
 import sglue "./sokol/glue"
 
-//shortening of linalg.to_radians
 to_radians :: linalg.to_radians
+Matrix4 :: linalg.Matrix4f32;
 
 //global var for context
 default_context: runtime.Context
@@ -152,8 +154,6 @@ init_cb :: proc "c" (){
 		data = sg_range(indices),
 	})
 
-	create_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
-
 	//create the sampler
 	g.sampler = sg.make_sampler({})
 }
@@ -190,7 +190,6 @@ cleanup_cb :: proc "c" (){
 
 	//destroy all the things we init
 	for obj in g.objects{
-		sg.destroy_image(obj.img)
 		sg.destroy_buffer(obj.vertex_buffer)
 	}
 	sg.destroy_sampler(g.sampler)
@@ -241,14 +240,15 @@ frame_cb :: proc "c" (){
 		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
 
 
-
-		//apply the bindings(something that says which things we want to draw)
 		b := sg.Bindings {
 			vertex_buffers = { 0 = obj.vertex_buffer },
 			index_buffer = g.index_buffer,
 			images = { IMG_tex = obj.img },
 			samplers = { SMP_smp = g.sampler },
 		}
+
+		//apply the bindings(something that says which things we want to draw)
+		
 
 		sg.apply_bindings(b)
 
@@ -395,6 +395,43 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 }
 
 //proc for creating a new sprite on the screen and drawing it every frame
+create_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring){
+
+
+	WHITE_IMAGE : cstring = "./assets/textures/WHITE_IMAGE.png"
+
+
+
+	// vertices
+	vertices := []Vertex_Data {
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {0,0} },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {1,0} },
+		{ pos = { -(size.x/2),  (size.y/2), 0 },	col = color_offset, uv = {0,1} },
+		{ pos = {  (size.x/2),  (size.y/2), 0 },	col = color_offset, uv = {1,1} },
+	}
+
+	append(&g.objects, Object{
+		{pos2.x, pos2.y, 0},
+		{0, 0, 0},
+		load_image(WHITE_IMAGE),
+		sg.make_buffer({ data = sg_range(vertices)}),
+		id
+	})
+}
+
+
+//proc for updating objects
+update_objects :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
+	for &i in g.objects{
+		if i.id == id{
+			i.pos = {pos2.x, pos2.y, 0}
+			i.rot = {rot3.x, rot3.y, rot3.z}
+		}
+	}
+}
+
+
+//proc for creating a new sprite on the screen and drawing it every frame
 create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
 
@@ -455,6 +492,8 @@ init_game_state :: proc(){
 		position = { 0,0,8 },
 		target = { 0,0,-1 },
 	}
+
+	create_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 }
 
 update_game_state :: proc(dt: f32){
@@ -463,3 +502,6 @@ update_game_state :: proc(dt: f32){
 	//camera_follow(g.player.pos)
 }
 
+//
+// FONT
+//
