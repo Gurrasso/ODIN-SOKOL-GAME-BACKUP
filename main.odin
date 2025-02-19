@@ -58,7 +58,12 @@ Player :: struct{
 	rot: f32,
 }
 
-
+FONT_INFO :: struct {
+	id: cstring,
+	img: sg.Image,
+	width: int,
+	height: int,
+}
 
 //global vars
 Globals :: struct {
@@ -75,6 +80,7 @@ Globals :: struct {
 		look: Vec2,
 	},
 	player: Player,
+	fonts: [dynamic]FONT_INFO,
 }
 g: ^Globals
 
@@ -112,6 +118,7 @@ init_cb :: proc "c" (){
 		allocator = sg.Allocator(shelpers.allocator(&default_context)),
 		logger = sg.Logger(shelpers.logger(&default_context)),
 	})
+
 
 	//the globals
 	g = new(Globals)
@@ -494,9 +501,13 @@ init_game_state :: proc(){
 	}
 
 	create_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
+
+	init_font("./assets/fonts/ARCADECLASSIC.TTF")
+	create_font(g.player.pos, g.player.size, {0, 1, 1, 0},g.fonts[0].img, g.player.id)
 }
 
 update_game_state :: proc(dt: f32){
+
 	//update_camera(dt)
 	update_player(dt)
 	//camera_follow(g.player.pos)
@@ -505,3 +516,108 @@ update_game_state :: proc(dt: f32){
 //
 // FONT
 //
+
+create_text :: proc(pos: Vec2, text_size: f32, text: string) {
+	using stbtt
+	
+	x: f32
+	y: f32
+
+	for char in text {
+		
+		advance_x: f32
+		advance_y: f32
+		q: aligned_quad
+		GetBakedQuad(&font.char_data[0], font_bitmap_w, font_bitmap_h, cast(i32)char - 32, &advance_x, &advance_y, &q, false)
+		// this is the the data for the aligned_quad we're given, with y+ going down
+		// x0, y0,     s0, t0, // top-left
+		// x1, y1,     s1, t1, // bottom-right
+		
+		
+		size := Vec2{ abs(q.x0 - q.x1), abs(q.y0 - q.y1) }
+		
+		bottom_left := Vec2{ q.x0, -q.y1 }
+		top_right := Vec2{ q.x1, -q.y0 }
+		assert(bottom_left + size == top_right)
+		
+		pos := Vec2{x,y}
+		
+		uv := Vec4{ q.s0, q.t1, q.s1, q.t0 }
+		
+		create_font(pos, text_size, uv, g.fonts[0].img, "font")
+		
+		x += advance_x
+		y += -advance_y
+	}
+
+}
+
+
+font_bitmap_w :: 256
+font_bitmap_h :: 256
+char_count :: 96
+
+Font :: struct {
+	char_data: [char_count]stbtt.bakedchar,
+}
+font: Font
+
+init_font :: proc(font_path: string) {
+	using stbtt
+	
+	bitmap, _ := mem.alloc(font_bitmap_w * font_bitmap_h)
+	font_height := 15 // for some reason this only bakes properly at 15 ? it's a 16px font dou...
+	path := font_path
+	ttf_data, err := os.read_entire_file(path)
+	assert(ttf_data != nil, "failed to read font")
+	
+	ret := BakeFontBitmap(raw_data(ttf_data), 0, auto_cast font_height, auto_cast bitmap, font_bitmap_w, font_bitmap_h, 32, char_count, &font.char_data[0])
+	assert(ret > 0, "not enough space in bitmap")
+	
+	stbi.write_png("font.png", auto_cast font_bitmap_w, auto_cast font_bitmap_h, 1, bitmap, auto_cast font_bitmap_w)
+	
+	// setup font atlas so we can use it in the shader
+	desc : sg.Image_Desc
+	desc.width = auto_cast font_bitmap_w
+	desc.height = auto_cast font_bitmap_h
+	desc.pixel_format = .R8
+	desc.data.subimage[0][0] = {ptr=bitmap, size=auto_cast (font_bitmap_w*font_bitmap_h)}
+	sg_img := sg.make_image(desc)
+	if sg_img.id == sg.INVALID_ID {
+		log.debug("failed to make image")
+	}
+	
+	store_font(font_bitmap_w, font_bitmap_h, sg_img, "font")
+}
+
+store_font :: proc(w: int, h: int, sg_img: sg.Image, font_id: cstring){
+	append(&g.fonts, FONT_INFO{
+		id = font_id,
+		img = sg_img,
+		width = w,
+		height = h,
+	})
+}
+
+create_font :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, img: sg.Image, id: cstring){
+	//color offset
+	WHITE :: sg.Color { 1,1,1,1 }
+
+
+
+	// vertices
+	vertices := []Vertex_Data {
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {text_uv.x, text_uv.y} },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {text_uv.z, text_uv.y} },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {text_uv.x, text_uv.w} },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {text_uv.z, text_uv.w} },
+	}
+
+	append(&g.objects, Object{
+		{pos2.x, pos2.y, 0},
+		{0, 0, 0},
+		img,
+		sg.make_buffer({ data = sg_range(vertices)}),
+		id
+	})
+}
