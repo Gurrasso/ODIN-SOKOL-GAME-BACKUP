@@ -401,7 +401,7 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 	 }
 }
 
-//proc for creating a new sprite on the screen and drawing it every frame
+//kinda scuffed but works
 create_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring){
 
 
@@ -438,7 +438,7 @@ update_objects :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 }
 
 
-//proc for creating a new sprite on the screen and drawing it every frame
+//proc for creating a new sprite on the screen and adding it to the objects
 create_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
 
