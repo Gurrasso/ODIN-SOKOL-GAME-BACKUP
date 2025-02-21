@@ -543,7 +543,7 @@ init_game_state :: proc(){
 	// setup the player
 	g.player = Player{
 		id = "Player",
-		sprite = "./assets/textures/RETRO_TEXTURE_PACK_SAMPLE/SAMPLE/BRICK_1A.PNG",
+		sprite = "./assets/textures/Random.png",
 		pos = {0, 0},
 		size ={1, 1},
 		rot = 0,

@@ -35,6 +35,12 @@ layout(binding=0) uniform sampler smp;
 out vec4 frag_color; 
 
 void main() {
+
+    if(texture(sampler2D(tex, smp), texcoord).a != 1.0f)
+    {
+        discard;
+    }
+    
     frag_color = texture(sampler2D(tex, smp), texcoord) * color; 
 }
 @end
