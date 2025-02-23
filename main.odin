@@ -38,6 +38,7 @@ Vertex_Data :: struct{
 	pos: Vec3,
 	col: sg.Color,
 	uv: Vec2,
+	tex_index: u8,
 }
 
 // Handle multiple objects
@@ -48,22 +49,6 @@ Object :: struct{
 	vertex_buffer: sg.Buffer,
 	id: cstring,
 
-}
-
-Player :: struct{
-	id: cstring,
-	sprite: cstring,
-	pos: Vec2,
-	size: Vec2,
-	rot: f32,
-}
-
-FONT_INFO :: struct {
-	id: cstring,
-	img: sg.Image,
-	width: int,
-	height: int,
-	char_data: [char_count]stbtt.bakedchar,
 }
 
 //global vars
@@ -140,6 +125,7 @@ init_cb :: proc "c" (){
 				ATTR_main_pos = { format = .FLOAT3 },
 				ATTR_main_col = { format = .FLOAT4 },
 				ATTR_main_uv = { format = .FLOAT2 },
+				ATTR_main_bytes0 = { format = .UBYTE4N },
 			}
 		},
 
@@ -179,6 +165,7 @@ cleanup_cb :: proc "c" (){
 	//destroy all the things we init
 	for obj in g.objects{
 		sg.destroy_buffer(obj.vertex_buffer)
+		sg.destroy_image(obj.img)
 	}
 	sg.destroy_sampler(g.sampler)
 	sg.destroy_buffer(g.index_buffer)
@@ -195,11 +182,6 @@ cleanup_cb :: proc "c" (){
 //Every frame
 frame_cb :: proc "c" (){
 	context = default_context
-
-	//tell the program to exit
-	if key_down[.ESCAPE] {
-		g.should_quit = true
-	}
 
 	//exit the program
 	if(g.should_quit){
@@ -332,12 +314,35 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 	 }
 }
 
+sg_color :: proc {
+	sg_color_from_rgb,
+	sg_color_from_rgba,
+}
+
+
+sg_color_from_rgba :: proc (color: Vec4) -> sg.Color{
+
+	new_color := sg.Color{color.r/255, color.g/255, color.b/255, color.a/255}
+
+	return new_color
+
+}
+
+sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
+
+	new_color := sg.Color{color.r/255, color.g/255, color.b/255, 1}
+
+	return new_color
+
+}
+
+
 //
 // DRAWING
 //
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring){
+init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring, tex_index2: u8 = 0){
 
 
 	WHITE_IMAGE : cstring = "./assets/textures/WHITE_IMAGE.png"
@@ -346,10 +351,10 @@ init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring){
 
 	// vertices
 	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.y} },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.y} },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.w} },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.w} },
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.y}, tex_index = tex_index2 },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.y}, tex_index = tex_index2 },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.w}, tex_index = tex_index2 },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.w}, tex_index = tex_index2 },
 	}
 
 	append(&g.objects, Object{
@@ -374,7 +379,7 @@ update_object :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
+init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, tex_index2: u8 = 0){
 
 
 	//color offset
@@ -386,10 +391,10 @@ init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring){
 
 	// vertices
 	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.y} },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.y} },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.w} },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.w} },
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.y}, tex_index = tex_index2  },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.y}, tex_index = tex_index2  },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.w}, tex_index = tex_index2  },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.w}, tex_index = tex_index2  },
 	}
 
 	append(&g.objects, Object{
@@ -417,8 +422,20 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 // FONT       (   kinda scuffed rn, gonna fix later(probably not)   )
 //
 
+FONT_INFO :: struct {
+	id: cstring,
+	img: sg.Image,
+	width: int,
+	height: int,
+	char_data: [char_count]stbtt.bakedchar,
+}
+
+font_bitmap_w :: 512
+font_bitmap_h :: 512
+char_count :: 96
+
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos2: Vec2, text_size: f32, margin: Vec2, text: string, font_id: cstring, text_object_id: cstring) {
+init_text :: proc(pos2: Vec2, text_size: f32 = 0.2, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -452,19 +469,15 @@ init_text :: proc(pos2: Vec2, text_size: f32, margin: Vec2, text: string, font_i
 		uv := Vec4{ q.s0, q.t1, q.s1, q.t0 }
 
 		advance_x = text_size + margin.x
+		advance_y = margin.y
 
-		create_text(pos, text_size, uv, atlas_image, text_object_id)
+		create_text(pos, text_size, uv, color, atlas_image, text_object_id)
 		
 		x += advance_x
 		y += -advance_y
 	}
 
 }
-
-
-font_bitmap_w :: 512
-font_bitmap_h :: 512
-char_count :: 96
 
 //initiate font and add it to the g.fonts
 init_font :: proc(font_path: string, font_h: i32, id: cstring) {
@@ -483,7 +496,22 @@ init_font :: proc(font_path: string, font_h: i32, id: cstring) {
 	
 	stbi.write_png("font.png", auto_cast font_bitmap_w, auto_cast font_bitmap_h, 1, bitmap, auto_cast font_bitmap_w)
 	
-	store_font(font_bitmap_w, font_bitmap_h, load_image("font.png"), font_char_data, id)
+
+	// setup font atlas so we can use it in the shader
+	desc : sg.Image_Desc
+	desc.width = auto_cast font_bitmap_w
+	desc.height = auto_cast font_bitmap_h
+	desc.pixel_format = .R8
+	desc.data.subimage[0][0] = {ptr=bitmap, size=auto_cast (font_bitmap_w*font_bitmap_h)}
+	sg_img := sg.make_image(desc)
+	if sg_img.id == sg.INVALID_ID {
+		log.debug("failed to make image")
+	}
+
+
+
+
+	store_font(font_bitmap_w, font_bitmap_h, sg_img, font_char_data, id)
 }
 
 //stores font data in g.fonts
@@ -498,18 +526,16 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 }
 
 //adds the char to the g.objects so it can be drawn
-create_text :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, img: sg.Image, id: cstring){
-	//color offset
-	WHITE :: sg.Color { 1,1,1,1 }
+create_text :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, id: cstring, tex_index2: u8 = 1){
 
 
 
 	// vertices
 	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {text_uv.x, text_uv.y} },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {text_uv.z, text_uv.y} },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {text_uv.x, text_uv.w} },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {text_uv.z, text_uv.w} },
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {text_uv.x, text_uv.y}, tex_index = tex_index2 },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {text_uv.z, text_uv.y}, tex_index = tex_index2 },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {text_uv.x, text_uv.w}, tex_index = tex_index2 },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {text_uv.z, text_uv.w}, tex_index = tex_index2 },
 	}
 
 	append(&g.objects, Object{
@@ -530,9 +556,20 @@ update_text :: proc(motion: Vec2, id: cstring){
 	}
 }
 
+
+
 //
 // GAME
 //
+
+
+Player :: struct{
+	id: cstring,
+	sprite: cstring,
+	pos: Vec2,
+	size: Vec2,
+	rot: f32,
+}
 
 init_game_state :: proc(){
 
@@ -557,16 +594,21 @@ init_game_state :: proc(){
 
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
-	init_font("./assets/fonts/ARCADECLASSIC.TTF", 64, "font1")
-	init_text({0,1}, 0.3, {0.01, 0},"hej wadwd", "font1", "text1")
+	init_font("./assets/fonts/MedodicaRegular.otf", 16, "font1")
+	init_text(pos2 = {0,1}, text = "TEST", color = sg_color(Vec3{100, 255, 100}), font_id = "font1")
 	//create_font(g.player.pos, g.player.size, {0, 1, 1, 0},g.fonts[0].img, g.player.id)
 }
 
 update_game_state :: proc(dt: f32){
 
+	//tell the program to exit if you hit escape
+	if key_down[.ESCAPE] {
+		g.should_quit = true
+	}
+
 	//update_camera(dt)
 	update_player(dt)
-	//camera_follow(g.player.pos)
+	camera_follow(g.player.pos)
 }
 
 //proc for quiting the game
@@ -617,10 +659,10 @@ update_player :: proc(dt: f32) {
 
 	//creates a player rotation based of the movement
 	if move_dir != 0 {
-		g.player.rot = linalg.to_degrees(math.atan(motion.y/motion.x))
+		g.player.rot = linalg.to_degrees(math.atan2(motion.y, motion.x))
 	}
 
-	check_collision()
+	//check_collision()
 
 
 	g.player.pos += motion
