@@ -388,7 +388,6 @@ init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, tex_
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
 
-
 	// vertices
 	vertices := []Vertex_Data {
 		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.y}, tex_index = tex_index2  },
@@ -480,7 +479,7 @@ init_text :: proc(pos2: Vec2, text_size: f32 = 0.2, margin: Vec2 = {0.02, 0}, co
 }
 
 //initiate font and add it to the g.fonts
-init_font :: proc(font_path: string, font_h: i32, id: cstring) {
+init_font :: proc(font_path: string, font_h: i32 = 16, id: cstring) {
 	using stbtt
 	
 	bitmap, _ := mem.alloc(font_bitmap_w * font_bitmap_h)
@@ -493,8 +492,6 @@ init_font :: proc(font_path: string, font_h: i32, id: cstring) {
 	
 	ret := BakeFontBitmap(raw_data(ttf_data), 0, auto_cast font_height, auto_cast bitmap, font_bitmap_w, font_bitmap_h, 32, char_count, &font_char_data[0])
 	assert(ret > 0, "not enough space in bitmap")
-	
-	stbi.write_png("font.png", auto_cast font_bitmap_w, auto_cast font_bitmap_h, 1, bitmap, auto_cast font_bitmap_w)
 	
 
 	// setup font atlas so we can use it in the shader
@@ -594,18 +591,15 @@ init_game_state :: proc(){
 
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
-	init_font("./assets/fonts/MedodicaRegular.otf", 16, "font1")
-	init_text(pos2 = {0,1}, text = "TEST", color = sg_color(Vec3{100, 255, 100}), font_id = "font1")
+	init_font(font_path = "./assets/fonts/ARCADECLASSIC.TTF", id = "font1")
+	init_text(pos2 = {-1.5,1}, text = "NINJA", color = sg_color(Vec3{0, 200, 100}), font_id = "font1", margin = {0.1, 0}, text_size = 1)
 	//create_font(g.player.pos, g.player.size, {0, 1, 1, 0},g.fonts[0].img, g.player.id)
 }
 
 update_game_state :: proc(dt: f32){
 
-	//tell the program to exit if you hit escape
-	if key_down[.ESCAPE] {
-		g.should_quit = true
-	}
-
+	event_listener()
+	
 	//update_camera(dt)
 	update_player(dt)
 	camera_follow(g.player.pos)
@@ -618,6 +612,13 @@ quit_game :: proc(){
 
 MOVE_SPEED :: 5
 LOOK_SENSITIVITY :: 0.3
+
+event_listener :: proc(){
+	//tell the program to exit if you hit escape
+	if key_down[.ESCAPE] {
+		g.should_quit = true
+	}
+}
 
 //check the player collision
 check_collision :: proc (){
