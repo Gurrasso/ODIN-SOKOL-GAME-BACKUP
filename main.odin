@@ -336,7 +336,6 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 }
 
-
 //
 // DRAWING
 //
@@ -434,7 +433,7 @@ font_bitmap_h :: 512
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos2: Vec2, text_size: f32 = 0.2, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
+init_text :: proc(pos2: Vec2, scale: f32 = 60, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -448,7 +447,8 @@ init_text :: proc(pos2: Vec2, text_size: f32 = 0.2, margin: Vec2 = {0.02, 0}, co
 	}
 
 	assert(atlas_image.id != 0, "failed to get font")
-	
+	using stbtt
+
 	x: f32 = pos2.x
 	y: f32 = pos2.y
 
@@ -463,19 +463,20 @@ init_text :: proc(pos2: Vec2, text_size: f32 = 0.2, margin: Vec2 = {0.02, 0}, co
 		
 		size := Vec2{ abs(q.x0 - q.x1), abs(q.y0 - q.y1) }
 		
-		pos := Vec2{x,y}
+		bottom_left := Vec2{ q.x0, -q.y1 }
+		top_right := Vec2{ q.x1, -q.y0 }
+
+		assert(bottom_left + size == top_right)
+		
+		offset_to_render_at := Vec2{x,y} + bottom_left/40
 		
 		uv := Vec4{ q.s0, q.t1, q.s1, q.t0 }
 
-		advance_x = text_size + margin.x
-		advance_y = margin.y
-
-		create_text(pos, text_size, uv, color, atlas_image, text_object_id)
+		create_text(offset_to_render_at, size/scale, uv, color, atlas_image, text_object_id)
 		
-		x += advance_x
-		y += -advance_y
+		x += advance_x/scale
+		y += -advance_y/scale
 	}
-
 }
 
 //initiate font and add it to the g.fonts
@@ -591,15 +592,13 @@ init_game_state :: proc(){
 
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
-	init_font(font_path = "./assets/fonts/ARCADECLASSIC.TTF", id = "font1")
-	init_text(pos2 = {-1.5,1}, text = "NINJA", color = sg_color(Vec3{0, 200, 100}), font_id = "font1", margin = {0.1, 0}, text_size = 1)
-	//create_font(g.player.pos, g.player.size, {0, 1, 1, 0},g.fonts[0].img, g.player.id)
+	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 64)
+	init_text(pos2 = {0,1}, text = "test TEST,,, gg?", color = sg_color(Vec3{255, 255, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
 
 	event_listener()
-	
 	//update_camera(dt)
 	update_player(dt)
 	camera_follow(g.player.pos)
