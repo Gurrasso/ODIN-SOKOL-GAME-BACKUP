@@ -2,6 +2,13 @@
 package main
 
 
+
+//
+// TODO: fix fonts, use hashmaps for things like the fonts?
+//
+
+
+
 // 
 //  IMPORTS
 //
