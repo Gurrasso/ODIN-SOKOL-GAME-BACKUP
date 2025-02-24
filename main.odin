@@ -336,31 +336,37 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 }
 
+get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, current_tex_index: u8) -> sg.Buffer{
+	vertices := []Vertex_Data {
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = current_tex_index  },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = current_tex_index  },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = current_tex_index  },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = current_tex_index  },
+	}
+	buffer := sg.make_buffer({ data = sg_range(vertices)})
+
+	return buffer
+}
+
 //
 // DRAWING
 //
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring, tex_index2: u8 = 0){
+init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring, current_tex_index: u8 = 0){
 
 
 	WHITE_IMAGE : cstring = "./assets/textures/WHITE_IMAGE.png"
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	// vertices
-	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.y}, tex_index = tex_index2 },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.y}, tex_index = tex_index2 },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.x, DEFAULT_UV.w}, tex_index = tex_index2 },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {DEFAULT_UV.z, DEFAULT_UV.w}, tex_index = tex_index2 },
-	}
+	vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, current_tex_index)
 
 	append(&g.objects, Object{
 		{pos2.x, pos2.y, 0},
 		{0, 0, 0},
 		load_image(WHITE_IMAGE),
-		sg.make_buffer({ data = sg_range(vertices)}),
+		vertex_buffer,
 		id
 	})
 }
@@ -378,7 +384,7 @@ update_object :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, tex_index2: u8 = 0){
+init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, current_tex_index: u8 = 0){
 
 
 	//color offset
@@ -387,20 +393,15 @@ init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, tex_
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
 
-	// vertices
-	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.y}, tex_index = tex_index2  },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.y}, tex_index = tex_index2  },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.x, DEFAULT_UV.w}, tex_index = tex_index2  },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = WHITE, uv = {DEFAULT_UV.z, DEFAULT_UV.w}, tex_index = tex_index2  },
-	}
+	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, current_tex_index)
+
 
 	append(&g.objects, Object{
 		{pos2.x, pos2.y, 0},
 		{0, 0, 0},
 		load_image(filename),
-		sg.make_buffer({ data = sg_range(vertices)}),
-		id
+		vertex_buffer,
+		id,
 	})
 }
 
@@ -524,23 +525,18 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 }
 
 //adds the char to the g.objects so it can be drawn
-create_text :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, id: cstring, tex_index2: u8 = 1){
+create_text :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, id: cstring, current_tex_index: u8 = 1){
 
 
 
 	// vertices
-	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {text_uv.x, text_uv.y}, tex_index = tex_index2 },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {text_uv.z, text_uv.y}, tex_index = tex_index2 },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {text_uv.x, text_uv.w}, tex_index = tex_index2 },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {text_uv.z, text_uv.w}, tex_index = tex_index2 },
-	}
+	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, current_tex_index)
 
 	append(&g.objects, Object{
 		{pos2.x, pos2.y, 0},
 		{0, 0, 0},
 		img,
-		sg.make_buffer({ data = sg_range(vertices)}),
+		vertex_buffer,
 		id
 	})
 }
