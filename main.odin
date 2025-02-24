@@ -348,6 +348,17 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, current
 	return buffer
 }
 
+xform_translate :: proc(pos: Vec2) -> Matrix4 {
+	return linalg.matrix4_translate(Vec3{pos.x, pos.y, 0})
+}
+xform_rotate :: proc(angle: f32) -> Matrix4 {
+	return linalg.matrix4_rotate(math.to_radians(angle), Vec3{0,0,1})
+}
+xform_scale :: proc(scale: Vec2) -> Matrix4 {
+	return linalg.matrix4_scale(Vec3{scale.x, scale.y, 1});
+}
+
+
 //
 // DRAWING
 //
@@ -429,12 +440,12 @@ FONT_INFO :: struct {
 	char_data: [char_count]stbtt.bakedchar,
 }
 
-font_bitmap_w :: 512
-font_bitmap_h :: 512
+font_bitmap_w :: 256
+font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos2: Vec2, scale: f32 = 60, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
+init_text :: proc(pos: Vec2, scale: f32, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -450,8 +461,8 @@ init_text :: proc(pos2: Vec2, scale: f32 = 60, margin: Vec2 = {0.02, 0}, color: 
 	assert(atlas_image.id != 0, "failed to get font")
 	using stbtt
 
-	x: f32 = pos2.x
-	y: f32 = pos2.y
+	x: f32
+	y: f32
 
 	for char in text {
 		
@@ -469,14 +480,21 @@ init_text :: proc(pos2: Vec2, scale: f32 = 60, margin: Vec2 = {0.02, 0}, color: 
 
 		assert(bottom_left + size == top_right)
 		
-		offset_to_render_at := Vec2{x,y} + bottom_left/40
+		offset_to_render_at := Vec2{x,y} + bottom_left
 		
 		uv := Vec4{ q.s0, q.t1, q.s1, q.t0 }
 
-		create_text(offset_to_render_at, size/scale, uv, color, atlas_image, text_object_id)
+		xform := Matrix4(1)
+		xform *= xform_translate(pos)
+		xform *= xform_scale(Vec2{auto_cast scale, auto_cast scale})
+		xform *= xform_translate(offset_to_render_at)
+
+		log.debug(xform)
+
+		create_text(offset_to_render_at, size, uv, color, atlas_image, text_object_id)
 		
-		x += advance_x/scale
-		y += -advance_y/scale
+		x +=  advance_x
+		y += -advance_y
 	}
 }
 
@@ -588,8 +606,8 @@ init_game_state :: proc(){
 
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
-	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 64)
-	init_text(pos2 = {0,1}, text = "test TEST,,, gg?", color = sg_color(Vec3{255, 255, 255}), font_id = "font1")
+	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
+	init_text(pos = {0,1}, scale = 0.1, text = "test", color = sg_color(Vec3{255, 255, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
