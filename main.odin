@@ -4,7 +4,7 @@ package main
 
 
 //
-// TODO: fix fonts, use hashmaps for things like the fonts?
+// TODO: fix fonts, use hashmaps for things like the fonts?, fix updating text position, size, and rotation
 //
 
 
@@ -496,9 +496,10 @@ init_text :: proc(pos: Vec2, scale: f32, margin: Vec2 = {0.02, 0}, color: sg.Col
 		xform *= xform_scale(Vec2{auto_cast scale, auto_cast scale})
 		xform *= xform_translate(offset_to_render_at)
 
-		log.debug(xform)
+		text_size := size*scale
+		char_pos := Vec2{xform[3][0], xform[3][1]}
 
-		create_text(offset_to_render_at, size, uv, color, atlas_image, text_object_id)
+		create_text(char_pos, text_size, uv, color, atlas_image, text_object_id)
 		
 		x +=  advance_x
 		y += -advance_y
@@ -614,7 +615,7 @@ init_game_state :: proc(){
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(pos = {0,1}, scale = 0.1, text = "test", color = sg_color(Vec3{255, 255, 255}), font_id = "font1")
+	init_text(pos = {0,0}, scale = 0.05, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
