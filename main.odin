@@ -34,7 +34,7 @@ Matrix4 :: linalg.Matrix4f32;
 //global var for context
 default_context: runtime.Context
 
-//define our own types
+//define own types
 Mat4 :: matrix[4, 4]f32
 Vec2 :: [2]f32
 Vec3 :: [3]f32
@@ -58,6 +58,12 @@ Object :: struct{
 
 }
 
+Camera :: struct{
+	position: Vec3,
+	target: Vec3,
+	look: Vec2,
+}
+
 //global vars
 Globals :: struct {
 	should_quit: bool,
@@ -67,11 +73,7 @@ Globals :: struct {
 	objects: [dynamic]Object,
 	sampler: sg.Sampler,
 	rotation: Vec3,
-	camera: struct{
-		position: Vec3,
-		target: Vec3,
-		look: Vec2,
-	},
+	camera: Camera,
 	player: Player,
 	fonts: [dynamic]FONT_INFO,
 }
@@ -281,6 +283,8 @@ mouse_move: Vec2
 
 //stores the states for all keys
 key_down: #sparse[sapp.Keycode]bool
+single_key_up: #sparse[sapp.Keycode]bool
+single_key_down: #sparse[sapp.Keycode]bool
 
 //Events
 event_cb :: proc "c" (ev: ^sapp.Event){
@@ -291,8 +295,10 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 			mouse_move += {ev.mouse_dx, ev.mouse_dy}
 		case .KEY_DOWN:
 			key_down[ev.key_code] = true
+			single_key_down[ev.key_code] = true
 		case .KEY_UP:
 			key_down[ev.key_code] = false
+			single_key_up[ev.key_code] = true
 	}
 }
 
@@ -300,6 +306,8 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 // UTILS
 //
 
+
+//sg range utils
 sg_range :: proc {
 	sg_range_from_struct,
 	sg_range_from_slice,
@@ -320,6 +328,8 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 		size = len(s) * size_of(s[0])
 	 }
 }
+
+//color utils
 
 sg_color :: proc {
 	sg_color_from_rgb,
@@ -343,6 +353,8 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 }
 
+//buffer util
+
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, current_tex_index: u8) -> sg.Buffer{
 	vertices := []Vertex_Data {
 		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = current_tex_index  },
@@ -354,6 +366,45 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, current
 
 	return buffer
 }
+
+//key press utils
+
+listen_key_single_up :: proc(keycode: sapp.Keycode) -> bool{
+	if single_key_up[keycode] {
+		single_key_up[keycode] = false
+		return true	
+	} else{
+		return false
+	}
+}
+
+listen_key_single_down :: proc(keycode: sapp.Keycode) -> bool{
+	if single_key_down[keycode] {
+		single_key_down[keycode] = false
+		return true	
+	} else{
+		return false
+	}
+
+}
+
+listen_key_down :: proc(keycode: sapp.Keycode) -> bool{
+	if key_down[keycode] {
+		return true	
+	} else{
+		return false
+	}
+}
+
+listen_key_up :: proc(keycode: sapp.Keycode) -> bool{
+	if key_down[keycode] == false {
+		return true	
+	} else{
+		return false
+	}
+}
+
+//xform utils
 
 xform_translate :: proc(pos: Vec2) -> Matrix4 {
 	return linalg.matrix4_translate(Vec3{pos.x, pos.y, 0})
@@ -452,7 +503,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32, margin: Vec2 = {0.02, 0}, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
+init_text :: proc(pos: Vec2, scale: f32, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -634,10 +685,16 @@ quit_game :: proc(){
 MOVE_SPEED :: 5
 LOOK_SENSITIVITY :: 0.3
 
+// all the event based checks (eg keyboard inputs)
 event_listener :: proc(){
-	//tell the program to exit if you hit escape
-	if key_down[.ESCAPE] {
+	//Exit program if you hit escape
+	if listen_key_down(.ESCAPE) {
 		g.should_quit = true
+	}
+
+	//fullscreen on F11
+	if listen_key_single_down(.F11) {
+		sapp.toggle_fullscreen()
 	}
 }
 
