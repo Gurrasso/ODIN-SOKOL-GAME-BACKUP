@@ -710,9 +710,6 @@ init_font :: proc(font_path: string, font_h: i32 = 16, id: cstring) {
 		log.debug("failed to make image")
 	}
 
-
-
-
 	store_font(font_bitmap_w, font_bitmap_h, sg_img, font_char_data, id)
 }
 
@@ -857,7 +854,7 @@ update_game_state :: proc(dt: f32){
 
 	test_text_rot += test_text_rot_speed * dt
 
-	update_text_rot(test_text_rot, "test_text")
+	update_text(test_text_rot, "test_text")
 }
 
 //proc for quiting the game
