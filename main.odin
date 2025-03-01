@@ -4,7 +4,7 @@ package main
 
 
 //
-// TODO: fix fonts, use hashmaps for things like the fonts?, fix updating text position, size, and rotation
+// TODO: fix fonts, use hashmaps for things like the fonts?, fix updating text size
 //
 
 
@@ -57,8 +57,16 @@ Object :: struct{
 	id: cstring,
 }
 
+Char_object :: struct{
+	pos: Vec3,
+	rotation_pos_offset: Vec2,
+	rot: Vec3,
+	img: sg.Image,
+	vertex_buffer: sg.Buffer,
+}
+
 Text_object :: struct{
-	objects: [dynamic]Object,
+	objects: [dynamic]Char_object,
 	pos: Vec2,
 	rot: Vec3,
 	id: cstring,
@@ -247,11 +255,13 @@ frame_cb :: proc "c" (){
 		sg.draw(0, 6, 1)
 	}
 
-	//do things for all objects
+	//do things for all text objects
 	for text_object in g.text_objects {
 		for obj in text_object.objects{
 			//matrix
-			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+
+			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
+			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
 	
 	
 			b := sg.Bindings {
@@ -478,7 +488,7 @@ remove_text_object :: proc(id: cstring) {
 //
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring, current_tex_index: u8 = 0){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0){
 
 
 	WHITE_IMAGE : cstring = "./assets/textures/WHITE_IMAGE.png"
@@ -498,18 +508,18 @@ init_rect :: proc(color_offset: sg.Color, pos2: Vec2, size: Vec2, id: cstring, c
 
 
 //proc for updating objects
-update_object :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
-	for &i in g.objects{
-		if i.id == id{
-			i.pos = {pos2.x, pos2.y, 0}
-			i.rot = {rot3.x, rot3.y, rot3.z}
+update_object :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+	for &obj in g.objects{
+		if obj.id == id{
+			obj.pos = {pos2.x, pos2.y, 0}
+			obj.rot = {rot3.x, rot3.y, rot3.z}
 		}
 	}
 }
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, current_tex_index: u8 = 0){
+init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0){
 
 
 	//color offset
@@ -531,11 +541,11 @@ init_sprite :: proc(filename: cstring, pos2: Vec2, size: Vec2, id: cstring, curr
 }
 
 //proc for updating sprites
-update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
-	for &i in g.objects{
-		if i.id == id{
-			i.pos = {pos2.x, pos2.y, 0}
-			i.rot = {rot3.x, rot3.y, rot3.z}
+update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+	for &obj in g.objects{
+		if obj.id == id{
+			obj.pos = {pos2.x, pos2.y, 0}
+			obj.rot = {rot3.x, rot3.y, rot3.z}
 		}
 	}
 }
@@ -543,7 +553,7 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3, id: cstring){
 
 
 //
-// FONT       (   kinda scuffed rn, gonna fix later(probably not)   )
+// FONT       (   a bit scuffed rn, gonna fix later(probably not)   )
 //
 
 FONT_INFO :: struct {
@@ -580,7 +590,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 	x: f32
 	y: f32
 
-	text_objects : [dynamic]Object
+	text_objects : [dynamic]Char_object
 
 	for char in text {
 		
@@ -610,7 +620,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		text_size := size*scale
 		char_pos := Vec2{xform[3][0], xform[3][1]}
 
-		char_obj := generate_text_object(char_pos, text_size, uv, color, atlas_image)
+		char_obj := generate_char_object(char_pos, text_size, uv, color, atlas_image)
 		
 		append(&text_objects, char_obj)
 
@@ -622,20 +632,22 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 	
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Object, text_object_id: cstring, text_pos: Vec2){
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
+	//Figure out the center point of the text
 	positions_total := Vec2{ 0,0 }
-
 	for obj in text_objects{
 		positions_total += Vec2{obj.pos.x, obj.pos.y}
 	}
-
 	text_center = positions_total/Vec2{f32(len(text_objects)), f32(len(text_objects))}
+	
+	//make the center y coord not be the center of all the positions. Instead it is the designated y coord for the text
+	text_center.y = text_pos.y
 
+	//offset the text so its center is at the text pos
 	difference := text_center-text_pos
-
 	text_center = text_pos
 	for &obj in text_objects{
 		obj.pos -= Vec3{difference.x, difference.y, 0}
@@ -645,23 +657,30 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Object, text_object
 	//rotation things
 	if text_rot.z != 0{
 		for &obj in text_objects{
-			obj.rot = rot
+			obj.rot = text_rot
+
 			obj_xform := xform_rotate(-obj.rot.z)
 			obj_xform *= xform_translate(Vec2{obj.pos.x, -obj.pos.y})
 			center_xform := xform_rotate(-obj.rot.z)
 			center_xform *= xform_translate(Vec2{text_center.x, -text_center.y})
 			obj_xform -= center_xform
+
 			new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_center.x, -text_center.y}
-			obj.pos = Vec3{new_pos2d.x, -new_pos2d.y, 0}
+			obj.rotation_pos_offset = Vec2{new_pos2d.x, -new_pos2d.y} - Vec2{obj.pos.x, obj.pos.y}
+				
 		}
 	}
 
+	//add the text objects to the text objects
 	append(&g.text_objects, Text_object{
 		text_objects,
 		text_center,
 		text_rot,
 		text_object_id,
 	})
+
+	//show the center point of the text
+	//init_rect(sg_color(Vec3{255, 255, 255}), text_center, {0.05, 0.05}, "center")
 }
 
 //initiate font and add it to the g.fonts
@@ -708,21 +727,26 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 	})
 }
 
-generate_text_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, current_tex_index: u8 = 1) -> Object{
+//generate the Char_object
+generate_char_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, current_tex_index: u8 = 1) -> Char_object{
 
 	// vertices
 	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, current_tex_index)
 
-	char_obj := Object{
+	char_obj := Char_object{
 		{pos2.x, pos2.y, 0},
+		{0, 0},
 		{0, 0, 0},
 		img,
 		vertex_buffer,
-		""
 	}
 
 	return char_obj
 }
+
+
+// Updating text
+
 
 update_text :: proc{
 	update_text_object,
@@ -757,13 +781,13 @@ update_text_rot :: proc(rot: f32, id: cstring){
 				obj_xform -= center_xform
 
 				new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_object.pos.x, -text_object.pos.y}
-				obj.pos = Vec3{new_pos2d.x, -new_pos2d.y, 0}
+				obj.rotation_pos_offset = Vec2{new_pos2d.x, -new_pos2d.y} - Vec2{obj.pos.x, obj.pos.y}
+
 			}
 		}
 	}
 }
 
-//update a text by changing its position(relative to its last position) kind of bad rn, also cant rotate (should fix)
 update_text_pos :: proc(pos: Vec2, id: cstring){
 
 	for &text_object in g.text_objects{
@@ -775,14 +799,14 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 			}
 		}
 	}
-}
 
+}
 
 
 //
 // GAME
 //
-
+ 
 
 Player :: struct{
 	id: cstring,
@@ -791,6 +815,10 @@ Player :: struct{
 	size: Vec2,
 	rot: f32,
 }
+
+//test text vars
+test_text_rot: f32 = 0;
+test_text_rot_speed: f32 = 120;
 
 init_game_state :: proc(){
 
@@ -816,7 +844,8 @@ init_game_state :: proc(){
 	init_player()
 
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(text_rot = 37, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
+	
+	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
@@ -825,6 +854,10 @@ update_game_state :: proc(dt: f32){
 	//update_camera(dt)
 	update_player(dt)
 	camera_follow(g.player.pos)
+
+	test_text_rot += test_text_rot_speed * dt
+
+	update_text_rot(test_text_rot, "test_text")
 }
 
 //proc for quiting the game
