@@ -559,8 +559,10 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", rot : Vec3 = { 0,0,0 }) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0) {
 	using stbtt
+
+	rotation : Vec3 = {0, 0, text_rot}
 
 	atlas_image : sg.Image
 	font_data : [char_count]stbtt.bakedchar
@@ -616,7 +618,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		y += -advance_y
 	}
 
-	append_text_object(rot, text_objects, text_object_id, pos)
+	append_text_object(rotation, text_objects, text_object_id, pos)
 	
 }
 
@@ -637,6 +639,21 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Object, text_object
 	text_center = text_pos
 	for &obj in text_objects{
 		obj.pos -= Vec3{difference.x, difference.y, 0}
+	}
+
+
+	//rotation things
+	if text_rot.z != 0{
+		for &obj in text_objects{
+			obj.rot = rot
+			obj_xform := xform_rotate(-obj.rot.z)
+			obj_xform *= xform_translate(Vec2{obj.pos.x, -obj.pos.y})
+			center_xform := xform_rotate(-obj.rot.z)
+			center_xform *= xform_translate(Vec2{text_center.x, -text_center.y})
+			obj_xform -= center_xform
+			new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_center.x, -text_center.y}
+			obj.pos = Vec3{new_pos2d.x, -new_pos2d.y, 0}
+		}
 	}
 
 	append(&g.text_objects, Text_object{
@@ -713,6 +730,7 @@ update_text :: proc{
 	update_text_pos,
 }
 
+//not super efficient, might fix later
 update_text_object :: proc(pos: Vec2, rot: f32, id: cstring){
 	update_text_rot(rot, id)
 	update_text_pos(pos, id)
@@ -798,7 +816,7 @@ init_game_state :: proc(){
 	init_player()
 
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(pos = {0, 1}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
+	init_text(text_rot = 37, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
