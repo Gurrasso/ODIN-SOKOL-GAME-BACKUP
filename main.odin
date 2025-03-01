@@ -559,7 +559,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", rot : Vec3 = { 0,0,0 }) {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -616,8 +616,13 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		y += -advance_y
 	}
 
+	append_text_object(rot, text_objects, text_object_id, pos)
+	
+}
+
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Object, text_object_id: cstring, text_pos: Vec2){
 	text_center : Vec2
-	text_rot : Vec3
+	text_rot : Vec3 = rot
 
 	positions_total := Vec2{ 0,0 }
 
@@ -626,6 +631,11 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 	}
 
 	text_center = positions_total/Vec2{f32(len(text_objects)), f32(len(text_objects))}
+
+	difference := text_center-text_pos
+	for &obj in text_objects{
+		obj.pos -= Vec3{difference.x, difference.y, 0}
+	}
 
 	append(&g.text_objects, Text_object{
 		text_objects,
@@ -695,10 +705,40 @@ generate_text_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset
 	return char_obj
 }
 
+update_text :: proc{
+	update_text_object,
+	update_text_rot,
+	update_text_pos,
+}
+
+update_text_object :: proc(pos: Vec2, rot: f32, id: cstring){
+
+}
+
+update_text_rot :: proc(rot: f32, id: cstring){
+
+	rotation := Vec3{0, 0, rot}
+
+	for &text_object in g.text_objects{
+		if text_object.id == id{
+
+			text_object.rot = rotation
+
+			for &obj in text_object.objects{
+
+				obj.rot = rotation
+
+				z_rotation := to_radians(obj.rot.z)
+				new_pos2d := Vec2{(obj.pos.x * linalg.acos(z_rotation)) - (obj.pos.y * linalg.asin(z_rotation)),  (obj.pos.y * linalg.acos(z_rotation)) - (obj.pos.x * linalg.asin(z_rotation))}
+				log.debug(new_pos2d)
+				obj.pos = Vec3{new_pos2d.x, -new_pos2d.y, 0}
+			}
+		}
+	}
+}
 
 //update a text by changing its position(relative to its last position) kind of bad rn, also cant rotate (should fix)
-update_text :: proc(pos: Vec2, id: cstring){
-
+update_text_pos :: proc(pos: Vec2, id: cstring){
 
 	for &text_object in g.text_objects{
 		if text_object.id == id{
@@ -751,8 +791,8 @@ init_game_state :: proc(){
 
 
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(pos = {0,0}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
-	update_text({2, 1}, "text")
+	init_text(pos = {0, 0}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
+	//update_text_rot(45, "text")
 }
 
 update_game_state :: proc(dt: f32){
