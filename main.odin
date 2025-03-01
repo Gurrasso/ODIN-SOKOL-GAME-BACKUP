@@ -853,7 +853,6 @@ update_game_state :: proc(dt: f32){
 	camera_follow(g.player.pos)
 
 	test_text_rot += test_text_rot_speed * dt
-
 	update_text(test_text_rot, "test_text")
 }
 
