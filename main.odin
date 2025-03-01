@@ -446,7 +446,7 @@ xform_translate :: proc(pos: Vec2) -> Matrix4 {
 	return linalg.matrix4_translate(Vec3{pos.x, pos.y, 0})
 }
 xform_rotate :: proc(angle: f32) -> Matrix4 {
-	return linalg.matrix4_rotate(math.to_radians(angle), Vec3{0,0,1})
+	return linalg.matrix4_rotate(to_radians(angle), Vec3{0,0,1})
 }
 xform_scale :: proc(scale: Vec2) -> Matrix4 {
 	return linalg.matrix4_scale(Vec3{scale.x, scale.y, 1});
@@ -633,6 +633,8 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Object, text_object
 	text_center = positions_total/Vec2{f32(len(text_objects)), f32(len(text_objects))}
 
 	difference := text_center-text_pos
+
+	text_center = text_pos
 	for &obj in text_objects{
 		obj.pos -= Vec3{difference.x, difference.y, 0}
 	}
@@ -712,6 +714,8 @@ update_text :: proc{
 }
 
 update_text_object :: proc(pos: Vec2, rot: f32, id: cstring){
+	update_text_rot(rot, id)
+	update_text_pos(pos, id)
 
 }
 
@@ -728,9 +732,13 @@ update_text_rot :: proc(rot: f32, id: cstring){
 
 				obj.rot = rotation
 
-				z_rotation := to_radians(obj.rot.z)
-				new_pos2d := Vec2{(obj.pos.x * linalg.acos(z_rotation)) - (obj.pos.y * linalg.asin(z_rotation)),  (obj.pos.y * linalg.acos(z_rotation)) - (obj.pos.x * linalg.asin(z_rotation))}
-				log.debug(new_pos2d)
+				obj_xform := xform_rotate(-obj.rot.z)
+				obj_xform *= xform_translate(Vec2{obj.pos.x, -obj.pos.y})
+				center_xform := xform_rotate(-obj.rot.z)
+				center_xform *= xform_translate(Vec2{text_object.pos.x, -text_object.pos.y})
+				obj_xform -= center_xform
+
+				new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_object.pos.x, -text_object.pos.y}
 				obj.pos = Vec3{new_pos2d.x, -new_pos2d.y, 0}
 			}
 		}
@@ -742,7 +750,7 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 
 	for &text_object in g.text_objects{
 		if text_object.id == id{
-			motion := text_object.pos + pos
+			motion := pos - text_object.pos
 			text_object.pos = pos
 			for &obj in text_object.objects{
 				obj.pos += Vec3{motion.x, motion.y, 0}
@@ -789,10 +797,8 @@ init_game_state :: proc(){
 
 	init_player()
 
-
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(pos = {0, 0}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
-	//update_text_rot(45, "text")
+	init_text(pos = {0, 1}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
