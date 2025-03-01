@@ -55,7 +55,13 @@ Object :: struct{
 	img: sg.Image,
 	vertex_buffer: sg.Buffer,
 	id: cstring,
+}
 
+Text_object :: struct{
+	objects: [dynamic]Object,
+	pos: Vec2,
+	rot: Vec3,
+	id: cstring,
 }
 
 Camera :: struct{
@@ -76,6 +82,7 @@ Globals :: struct {
 	camera: Camera,
 	player: Player,
 	fonts: [dynamic]FONT_INFO,
+	text_objects: [dynamic]Text_object,
 }
 g: ^Globals
 
@@ -238,6 +245,35 @@ frame_cb :: proc "c" (){
 
 		//drawing
 		sg.draw(0, 6, 1)
+	}
+
+	//do things for all objects
+	for text_object in g.text_objects {
+		for obj in text_object.objects{
+			//matrix
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+	
+	
+			b := sg.Bindings {
+				vertex_buffers = { 0 = obj.vertex_buffer },
+				index_buffer = g.index_buffer,
+				images = { IMG_tex = obj.img },
+				samplers = { SMP_smp = g.sampler },
+			}
+	
+			//apply the bindings(something that says which things we want to draw)
+			
+	
+			sg.apply_bindings(b)
+	
+			//apply uniforms
+			sg.apply_uniforms(UB_vs_params, sg_range(&Vs_Params{
+				mvp = p * v * m
+			}))
+	
+			//drawing
+			sg.draw(0, 6, 1)
+		}
 	}
 
 	sg.end_pass()
@@ -416,6 +452,26 @@ xform_scale :: proc(scale: Vec2) -> Matrix4 {
 	return linalg.matrix4_scale(Vec3{scale.x, scale.y, 1});
 }
 
+//removing objects
+
+remove_object ::  proc(id: cstring){
+	for i := 0; i < len(g.objects); i += 1 {
+		if g.objects[i].id == id{
+			ordered_remove(&g.objects, i)
+			i-=1
+		}
+	}
+}
+
+remove_text_object :: proc(id: cstring) {
+	for i := 0; i < len(g.text_objects); i += 1 {
+		if g.text_objects[i].id == id{
+			ordered_remove(&g.text_objects, i)
+			i-=1
+		}
+	}
+}
+
 
 //
 // DRAWING
@@ -503,7 +559,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text") {
 	using stbtt
 
 	atlas_image : sg.Image
@@ -521,6 +577,8 @@ init_text :: proc(pos: Vec2, scale: f32, color: sg.Color = { 1,1,1,1 }, text: st
 
 	x: f32
 	y: f32
+
+	text_objects : [dynamic]Object
 
 	for char in text {
 		
@@ -550,11 +608,31 @@ init_text :: proc(pos: Vec2, scale: f32, color: sg.Color = { 1,1,1,1 }, text: st
 		text_size := size*scale
 		char_pos := Vec2{xform[3][0], xform[3][1]}
 
-		create_text(char_pos, text_size, uv, color, atlas_image, text_object_id)
+		char_obj := generate_text_object(char_pos, text_size, uv, color, atlas_image)
 		
+		append(&text_objects, char_obj)
+
 		x +=  advance_x
 		y += -advance_y
 	}
+
+	text_center : Vec2
+	text_rot : Vec3
+
+	positions_total := Vec2{ 0,0 }
+
+	for obj in text_objects{
+		positions_total += Vec2{obj.pos.x, obj.pos.y}
+	}
+
+	text_center = positions_total/Vec2{f32(len(text_objects)), f32(len(text_objects))}
+
+	append(&g.text_objects, Text_object{
+		text_objects,
+		text_center,
+		text_rot,
+		text_object_id,
+	})
 }
 
 //initiate font and add it to the g.fonts
@@ -601,28 +679,34 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 	})
 }
 
-//adds the char to the g.objects so it can be drawn
-create_text :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, id: cstring, current_tex_index: u8 = 1){
-
-
+generate_text_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, current_tex_index: u8 = 1) -> Object{
 
 	// vertices
 	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, current_tex_index)
 
-	append(&g.objects, Object{
+	char_obj := Object{
 		{pos2.x, pos2.y, 0},
 		{0, 0, 0},
 		img,
 		vertex_buffer,
-		id
-	})
+		""
+	}
+
+	return char_obj
 }
 
+
 //update a text by changing its position(relative to its last position) kind of bad rn, also cant rotate (should fix)
-update_text :: proc(motion: Vec2, id: cstring){
-	for &i in g.objects{
-		if i.id == id{
-			i.pos = {i.pos.x + motion.x, i.pos.y + motion.y, 0}
+update_text :: proc(pos: Vec2, id: cstring){
+
+
+	for &text_object in g.text_objects{
+		if text_object.id == id{
+			motion := text_object.pos + pos
+			text_object.pos = pos
+			for &obj in text_object.objects{
+				obj.pos += Vec3{motion.x, motion.y, 0}
+			}
 		}
 	}
 }
@@ -663,10 +747,12 @@ init_game_state :: proc(){
 		target = { 0,0,-1 },
 	}
 
-	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
+	init_player()
+
 
 	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
-	init_text(pos = {0,0}, scale = 0.05, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
+	init_text(pos = {0,0}, scale = 0.01, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
+	update_text({2, 1}, "text")
 }
 
 update_game_state :: proc(dt: f32){
@@ -720,7 +806,10 @@ check_collision :: proc (){
 	}
 }
 
-//function for moving around camera
+init_player :: proc(){
+	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
+}
+
 update_player :: proc(dt: f32) {
 	move_input: Vec2
 	if key_down[.W] do move_input.y = 1
