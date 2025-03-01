@@ -3,7 +3,7 @@
 // 
 
 @header package main
-@header import sg "./sokol/gfx"
+@header import sg "../sokol/gfx"
 
 @ctype mat4 Mat4
 

@@ -23,10 +23,10 @@ import "core:os"
 import stbi "vendor:stb/image"
 import stbtt "vendor:stb/truetype"
 // sokol imports
-import sapp "./sokol/app"
-import shelpers "./sokol/helpers"
-import sg "./sokol/gfx"
-import sglue "./sokol/glue"
+import sapp "../sokol/app"
+import shelpers "../sokol/helpers"
+import sg "../sokol/gfx"
+import sglue "../sokol/glue"
 
 to_radians :: linalg.to_radians
 Matrix4 :: linalg.Matrix4f32;
@@ -491,7 +491,7 @@ remove_text_object :: proc(id: cstring) {
 init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0){
 
 
-	WHITE_IMAGE : cstring = "./assets/textures/WHITE_IMAGE.png"
+	WHITE_IMAGE : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -826,7 +826,7 @@ init_game_state :: proc(){
 	// setup the player
 	g.player = Player{
 		id = "Player",
-		sprite = "./assets/textures/Random.png",
+		sprite = "./source/assets/textures/Random.png",
 		pos = {0, 0},
 		size ={1, 1},
 		rot = 0,
@@ -840,7 +840,7 @@ init_game_state :: proc(){
 
 	init_player()
 
-	init_font(font_path = "./assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
+	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{100, 0, 255}), font_id = "font1")
 }
@@ -931,6 +931,7 @@ update_player :: proc(dt: f32) {
 	update_sprite(g.player.pos, {0, 0, g.player.rot}, g.player.id)
 }
 
+//follows a 2d position
 camera_follow :: proc(position: Vec2) {
 	g.camera.position = {position.x, position.y, g.camera.position.z}
 	g.camera.target = {position.x, position.y, g.camera.target.z}
