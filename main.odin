@@ -124,6 +124,8 @@ init_cb :: proc "c" (){
 		logger = sg.Logger(shelpers.logger(&default_context)),
 	})
 
+	//white image for scuffed rect rendering
+	WHITE_IMAGE = load_image(WHITE_IMAGE_PATH)
 
 	//the globals
 	g = new(Globals)
@@ -518,11 +520,11 @@ spring_physics :: proc(spring: ^Spring){
 // DRAWING
 //
 
+WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
+WHITE_IMAGE : sg.Image
+
 //kinda scuffed but works
 init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0){
-
-
-	WHITE_IMAGE : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -531,7 +533,7 @@ init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, si
 	append(&g.objects, Object{
 		{pos2.x, pos2.y, 0},
 		{0, 0, 0},
-		load_image(WHITE_IMAGE),
+		WHITE_IMAGE,
 		vertex_buffer,
 		id
 	})
@@ -922,7 +924,7 @@ init_player :: proc(){
 	g.player = Player{
 		id = "Player",
 		sprite = "./source/assets/textures/Random.png",
-		pos = {0, 0},
+		pos = {-1.3, 0},
 		size ={1, 1},
 		rot = 0,
 		move_dir = {1, 0},
@@ -931,8 +933,7 @@ init_player :: proc(){
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
-
-	init_rect(size = {2, 0.5}, pos2 = {1, 0})
+	init_rect(size = {1.6, 0.15}, pos2 = {0, -0.051})
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 }
 
@@ -1095,7 +1096,7 @@ init_camera :: proc(){
 		target = { 0,0,-1 },
 		spring = Spring{
 			anchor = g.player.pos,
-			position = Vec2{0, 0},
+			position = g.player.pos,
 			velocity = Vec2{0, 0},
 			restlength = 0,
 			spring_force = 0.09,
