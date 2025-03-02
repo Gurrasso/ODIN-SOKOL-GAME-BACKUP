@@ -482,6 +482,15 @@ remove_text_object :: proc(id: cstring) {
 	}
 }
 
+//rotation of objects around center point
+
+vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
+	obj_xform := xform_rotate(-rot)
+	obj_xform *= xform_translate(objpos - centerpos)
+
+	new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{centerpos.x, -centerpos.y}
+	return Vec2{new_pos2d.x, -new_pos2d.y} - objpos
+}
 
 //
 // DRAWING
@@ -659,15 +668,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 		for &obj in text_objects{
 			obj.rot = text_rot
 
-			obj_xform := xform_rotate(-obj.rot.z)
-			obj_xform *= xform_translate(Vec2{obj.pos.x, -obj.pos.y})
-			center_xform := xform_rotate(-obj.rot.z)
-			center_xform *= xform_translate(Vec2{text_center.x, -text_center.y})
-			obj_xform -= center_xform
-
-			new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_center.x, -text_center.y}
-			obj.rotation_pos_offset = Vec2{new_pos2d.x, -new_pos2d.y} - Vec2{obj.pos.x, obj.pos.y}
-				
+			obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_center, obj.rot.z)
 		}
 	}
 
@@ -770,16 +771,7 @@ update_text_rot :: proc(rot: f32, id: cstring){
 			for &obj in text_object.objects{
 
 				obj.rot = rotation
-
-				obj_xform := xform_rotate(-obj.rot.z)
-				obj_xform *= xform_translate(Vec2{obj.pos.x, -obj.pos.y})
-				center_xform := xform_rotate(-obj.rot.z)
-				center_xform *= xform_translate(Vec2{text_object.pos.x, -text_object.pos.y})
-				obj_xform -= center_xform
-
-				new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{text_object.pos.x, -text_object.pos.y}
-				obj.rotation_pos_offset = Vec2{new_pos2d.x, -new_pos2d.y} - Vec2{obj.pos.x, obj.pos.y}
-
+				obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_object.pos, obj.rot.z)
 			}
 		}
 	}
@@ -814,8 +806,8 @@ Player :: struct{
 }
 
 //test text vars
-test_text_rot: f32 = 0;
-test_text_rot_speed: f32 = 120;
+test_text_rot: f32
+test_text_rot_speed: f32 = 120
 
 init_game_state :: proc(){
 
