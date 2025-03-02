@@ -57,25 +57,13 @@ Object :: struct{
 	id: cstring,
 }
 
-Char_object :: struct{
-	pos: Vec3,
-	rotation_pos_offset: Vec2,
-	rot: Vec3,
-	img: sg.Image,
-	vertex_buffer: sg.Buffer,
-}
-
-Text_object :: struct{
-	objects: [dynamic]Char_object,
-	pos: Vec2,
-	rot: Vec3,
-	id: cstring,
-}
-
-Camera :: struct{
-	position: Vec3,
-	target: Vec3,
-	look: Vec2,
+Spring :: struct{
+	anchor: Vec2,
+	position: Vec2,
+	velocity: Vec2,
+	restlength: f32,
+	spring_force: f32,
+	depletion: f32,
 }
 
 //global vars
@@ -340,11 +328,22 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 		case .MOUSE_MOVE:
 			mouse_move += {ev.mouse_dx, ev.mouse_dy}
 		case .KEY_DOWN:
+
+			if key_down[ev.key_code] == false && single_key_down[ev.key_code] == false{
+				single_key_down[ev.key_code] = true
+			}
+
 			key_down[ev.key_code] = true
-			single_key_down[ev.key_code] = true
+
+			single_key_up[ev.key_code] = false
 		case .KEY_UP:
+			if !key_down[ev.key_code] == false && single_key_up[ev.key_code] == false{
+				single_key_up[ev.key_code] = true
+			}
+
 			key_down[ev.key_code] = false
-			single_key_up[ev.key_code] = true
+
+			single_key_down[ev.key_code] = false
 	}
 }
 
@@ -492,6 +491,26 @@ vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 	return Vec2{new_pos2d.x, -new_pos2d.y} - objpos
 }
 
+//math util
+
+vector_magnitude :: proc(vec: Vec2) -> f32{
+	magv := math.sqrt(vec.x * vec.x  + vec.y * vec.y)
+	return magv
+}
+
+//spring physics
+spring_physics :: proc(spring: ^Spring){
+
+	force := spring.position - spring.anchor
+	x := vector_magnitude(force)
+	force = linalg.normalize0(force)
+	force *= -1 * spring.spring_force * x
+	spring.velocity += force
+	spring.position += spring.velocity
+	spring.velocity *= spring.depletion
+	
+}
+
 //
 // DRAWING
 //
@@ -564,6 +583,21 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 //
 // FONT       (   a bit scuffed rn, gonna fix later(probably not)   )
 //
+
+Char_object :: struct{
+	pos: Vec3,
+	rotation_pos_offset: Vec2,
+	rot: Vec3,
+	img: sg.Image,
+	vertex_buffer: sg.Buffer,
+}
+
+Text_object :: struct{
+	objects: [dynamic]Char_object,
+	pos: Vec2,
+	rot: Vec3,
+	id: cstring,
+}
 
 FONT_INFO :: struct {
 	id: cstring,
@@ -795,15 +829,6 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 //
 // GAME
 //
- 
-
-Player :: struct{
-	id: cstring,
-	sprite: cstring,
-	pos: Vec2,
-	size: Vec2,
-	rot: f32,
-}
 
 //test text vars
 test_text_rot: f32
@@ -815,22 +840,9 @@ init_game_state :: proc(){
 	sapp.lock_mouse(true)
 	//sapp.toggle_fullscreen()
 
-	// setup the player
-	g.player = Player{
-		id = "Player",
-		sprite = "./source/assets/textures/Random.png",
-		pos = {0, 0},
-		size ={1, 1},
-		rot = 0,
-	}
-
-	//setup the camera
-	g.camera = {
-		position = { 0,0,8 },
-		target = { 0,0,-1 },
-	}
-
 	init_player()
+
+	init_camera()
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
@@ -852,9 +864,6 @@ update_game_state :: proc(dt: f32){
 quit_game :: proc(){
 	sapp.quit()
 }
-
-MOVE_SPEED :: 5
-LOOK_SENSITIVITY :: 0.3
 
 // all the event based checks (eg keyboard inputs)
 event_listener :: proc(){
@@ -891,7 +900,36 @@ check_collision :: proc (){
 	}
 }
 
+// PLAYER
+
+
+Player :: struct{
+	id: cstring,
+	sprite: cstring,
+	pos: Vec2,
+	size: Vec2,
+	rot: f32,
+	move_dir: Vec2,
+	default_move_speed: f32,
+	move_speed: f32,
+}
+
 init_player :: proc(){
+	// setup the player
+	g.player = Player{
+		id = "Player",
+		sprite = "./source/assets/textures/Random.png",
+		pos = {0, 0},
+		size ={1, 1},
+		rot = 0,
+		move_dir = {1, 0},
+		default_move_speed = 5,
+	}
+	g.player.move_speed = g.player.default_move_speed
+	init_player_abilities()
+
+
+	init_rect(size = {2, 0.5}, pos2 = {1, 0})
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 }
 
@@ -905,27 +943,171 @@ update_player :: proc(dt: f32) {
 	up := Vec2{0,1}
 	right := Vec2{1,0}
 
+	motion : Vec2
 
-	move_dir := up * move_input.y + right * move_input.x
-
-	motion := linalg.normalize0(move_dir) * MOVE_SPEED * dt
-
-	//creates a player rotation based of the movement
-	if move_dir != 0 {
-		g.player.rot = linalg.to_degrees(math.atan2(motion.y, motion.x))
+	if move_input != 0 {
+		g.player.move_dir = up * move_input.y + right * move_input.x
+	
+		motion = linalg.normalize0(g.player.move_dir) * g.player.move_speed * dt
 	}
 
-	//check_collision()
+	update_player_abilities(dt)
+
+	//creates a player rotation based of the movement
+	g.player.rot = linalg.to_degrees(math.atan2(g.player.move_dir.y, g.player.move_dir.x))
+
+	
 
 
 	g.player.pos += motion
 	update_sprite(g.player.pos, {0, 0, g.player.rot}, g.player.id)
 }
 
+
+// PLAYER ABILITIES
+
+init_player_abilities :: proc(){
+	init_dash()
+	init_sprint()
+}
+
+update_player_abilities :: proc(dt: f32){
+
+	//check for dash
+	if listen_key_single_down(dash.button){
+		dash.enabled = true
+	}
+	if dash.enabled == true{
+		player_dash(dt)
+	}
+
+
+	//check for sprint
+	if listen_key_down(sprint.button) do sprint.enabled = true
+	else do sprint.enabled = false
+	update_sprint()
+
+}
+
+//DASH ABILIY
+
+Dash_data :: struct{
+	enabled: bool,
+	default_distance: f32,
+	button: sapp.Keycode,
+	duration_speed: f32,
+	duration: f32,
+	last_distance: f32,
+	distance: f32,
+	cutoff: f32,
+}
+
+dash: Dash_data
+
+init_dash :: proc(){
+	dash = {
+		enabled = false,
+		//distance that is going to be traveled by the player
+		default_distance = 1.6,
+		//dash button
+		button = .SPACE,
+		//How fast it travels
+		duration_speed = 5,
+		//The duration traveled
+		duration = 0,
+		//The last distance traveled
+		last_distance = 0,
+		//The distance traveled
+		distance = 0,
+		//cutoff var for cutting off the ease function
+		cutoff = 0.96,
+	}
+}
+
+dash_ease :: proc(x: f32) -> f32 {
+	ease := 1 - math.pow(1 - x, 3);
+
+	return ease
+}
+
+player_dash :: proc(dt: f32){
+	dash.duration +=dash.duration_speed * dt
+	dash.distance = dash_ease(dash.duration)
+
+
+	// do the ability
+	dash_motion := linalg.normalize0(g.player.move_dir) * (dash.default_distance/dash.cutoff)
+	g.player.pos += dash_motion * (dash.distance-dash.last_distance)
+	g.player.move_speed = 0
+
+	dash.last_distance = dash.distance
+	
+	if dash.distance >= dash.cutoff{
+		init_dash()
+		g.player.move_speed = g.player.default_move_speed
+	}
+}
+
+//SPRINT ABILITY
+
+Sprint_data :: struct{
+	enabled: bool,
+	//sprint button
+	button: sapp.Keycode,
+	//sprint speed
+	speed: f32,
+}
+
+sprint: Sprint_data
+
+init_sprint :: proc(){
+	sprint = {
+		enabled = false,
+		button = .LEFT_SHIFT,
+		speed = 7.5,
+	}
+}
+
+update_sprint :: proc(){
+	if sprint.enabled == true do g.player.move_speed = sprint.speed
+	else do g.player.move_speed = g.player.default_move_speed
+}
+
+// CAMERA
+
+Camera :: struct{
+	position: Vec3,
+	target: Vec3,
+	look: Vec2,
+	spring: Spring,
+}
+
+LOOK_SENSITIVITY :: 0.3
+
+init_camera :: proc(){
+	//setup the camera
+	g.camera = {
+		position = { 0,0,10 },
+		//what the camera is looking at
+		target = { 0,0,-1 },
+		spring = Spring{
+			anchor = g.player.pos,
+			position = Vec2{0, 0},
+			velocity = Vec2{0, 0},
+			restlength = 0,
+			spring_force = 0.08,
+			depletion = 0.5,
+		},
+	}
+}
+
 //follows a 2d position
 camera_follow :: proc(position: Vec2) {
-	g.camera.position = {position.x, position.y, g.camera.position.z}
-	g.camera.target = {position.x, position.y, g.camera.target.z}
+	g.camera.spring.anchor = position
+	spring_physics(&g.camera.spring)
+	g.camera.position = Vec3{g.camera.spring.position.x, g.camera.spring.position.y, g.camera.position.z}
+	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
+
 }
 
 //function for moving around camera
@@ -948,7 +1130,7 @@ update_camera :: proc(dt: f32) {
 
 	move_dir := forward * move_input.y + right * move_input.x
 
-	motion := linalg.normalize0(move_dir) * MOVE_SPEED * dt
+	motion := linalg.normalize0(move_dir) * g.player.move_speed * dt
 	g.camera.position += motion
 
 	g.camera.target = g.camera.position + forward
