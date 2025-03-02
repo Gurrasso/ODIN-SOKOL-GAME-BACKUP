@@ -82,7 +82,10 @@ Globals :: struct {
 }
 g: ^Globals
 
-//main
+// 
+// MAIN!!!!!
+// 
+
 main :: proc(){
 	//logger
 	context.logger = log.create_console_logger()
@@ -1095,7 +1098,7 @@ init_camera :: proc(){
 			position = Vec2{0, 0},
 			velocity = Vec2{0, 0},
 			restlength = 0,
-			spring_force = 0.08,
+			spring_force = 0.09,
 			depletion = 0.5,
 		},
 	}
@@ -1107,7 +1110,6 @@ camera_follow :: proc(position: Vec2) {
 	spring_physics(&g.camera.spring)
 	g.camera.position = Vec3{g.camera.spring.position.x, g.camera.spring.position.y, g.camera.position.z}
 	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
-
 }
 
 //function for moving around camera
