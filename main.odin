@@ -498,16 +498,16 @@ vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 
 //math util
 
-vector_magnitude :: proc(vec: Vec2) -> f32{
+get_vector_magnitude :: proc(vec: Vec2) -> f32{
 	magv := math.sqrt(vec.x * vec.x  + vec.y * vec.y)
 	return magv
 }
 
 //spring physics
-spring_physics :: proc(spring: ^Spring){
+update_spring_physics :: proc(spring: ^Spring){
 
 	force := spring.position - spring.anchor
-	x := vector_magnitude(force)
+	x := get_vector_magnitude(force)
 	force = linalg.normalize0(force)
 	force *= -1 * spring.spring_force * x
 	spring.velocity += force
@@ -1084,6 +1084,7 @@ Camera :: struct{
 	target: Vec3,
 	look: Vec2,
 	spring: Spring,
+	look_ahead: f32,
 }
 
 LOOK_SENSITIVITY :: 0.3
@@ -1094,21 +1095,26 @@ init_camera :: proc(){
 		position = { 0,0,10 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
+		look_ahead = 0.6,
 		spring = Spring{
 			anchor = g.player.pos,
 			position = g.player.pos,
 			velocity = Vec2{0, 0},
-			restlength = 0,
-			spring_force = 0.09,
+			restlength = 0.6,
+			spring_force = 0.03,
 			depletion = 0.5,
-		},
+		}
 	}
 }
 
 //follows a 2d position
 camera_follow :: proc(position: Vec2) {
-	g.camera.spring.anchor = position
-	spring_physics(&g.camera.spring)
+
+	//pos camera wants to look at
+	look_ahead_pos := (position+(g.player.move_dir * g.camera.look_ahead))
+
+	g.camera.spring.anchor = look_ahead_pos
+	update_spring_physics(&g.camera.spring)
 	g.camera.position = Vec3{g.camera.spring.position.x, g.camera.spring.position.y, g.camera.position.z}
 	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
 }
