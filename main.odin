@@ -857,7 +857,7 @@ init_game_state :: proc(){
 update_game_state :: proc(dt: f32){
 
 	event_listener()
-	//update_camera(dt)
+	//move_camera_3D(dt)
 	update_player(dt)
 	camera_follow(g.player.pos, g.camera.look_ahead)
 
@@ -1012,7 +1012,7 @@ init_dash :: proc(){
 	dash = {
 		enabled = false,
 		//distance that is going to be traveled by the player
-		default_distance = 1.6,
+		default_distance = 1.4,
 		//dash button
 		button = .SPACE,
 		//How fast it travels
@@ -1129,7 +1129,7 @@ last_player_pos: Vec2
 current_player_pos: Vec2
 
 
-//follows a 2d position
+//follows a 2d position 
 camera_follow :: proc(position: Vec2, look_ahead: f32) {
 
 	current_player_pos = g.player.pos
@@ -1140,7 +1140,7 @@ camera_follow :: proc(position: Vec2, look_ahead: f32) {
 	
 	player_pos_difference := current_player_pos - last_player_pos
 
-	log.debug(get_vector_magnitude(player_pos_difference))
+	//log.debug(get_vector_magnitude(player_pos_difference))
 
 	//change the spring force
 	for sf in g.camera.spring_forces{
@@ -1149,17 +1149,22 @@ camera_follow :: proc(position: Vec2, look_ahead: f32) {
 		}
 	}
 
-
+	//update the spring physics and update the camera position
 	update_spring_physics(&g.camera.spring)
-	g.camera.position = Vec3{g.camera.spring.position.x, g.camera.spring.position.y, g.camera.position.z}
-	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
+	update_camera_position(g.camera.spring.position)
 
 	last_player_pos = current_player_pos
 
 }
 
-//function for moving around camera
-update_camera :: proc(dt: f32) {
+update_camera_position :: proc(position: Vec2){
+	g.camera.position = Vec3{position.x, position.y, g.camera.position.z}
+	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
+
+}
+
+//function for moving around camera in 3D
+move_camera_3D :: proc(dt: f32) {
 	move_input: Vec2
 	if key_down[.W] do move_input.y = 1
 	else if key_down[.S] do move_input.y = -1
