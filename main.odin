@@ -62,7 +62,7 @@ Spring :: struct{
 	position: Vec2,
 	velocity: Vec2,
 	restlength: f32,
-	spring_force: f32,
+	force: f32,
 	depletion: f32,
 }
 
@@ -507,9 +507,9 @@ get_vector_magnitude :: proc(vec: Vec2) -> f32{
 update_spring_physics :: proc(spring: ^Spring){
 
 	force := spring.position - spring.anchor
-	x := get_vector_magnitude(force)
+	x := get_vector_magnitude(force) - spring.restlength
 	force = linalg.normalize0(force)
-	force *= -1 * spring.spring_force * x
+	force *= -1 * spring.force * x
 	spring.velocity += force
 	spring.position += spring.velocity
 	spring.velocity *= spring.depletion
@@ -859,7 +859,7 @@ update_game_state :: proc(dt: f32){
 	event_listener()
 	//update_camera(dt)
 	update_player(dt)
-	camera_follow(g.player.pos)
+	camera_follow(g.player.pos, g.camera.look_ahead)
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
@@ -1085,6 +1085,12 @@ Camera :: struct{
 	look: Vec2,
 	spring: Spring,
 	look_ahead: f32,
+	spring_forces: [dynamic]Spring_forces
+}
+
+Spring_forces :: struct{
+	force: f32,
+	threshold: f32,
 }
 
 LOOK_SENSITIVITY :: 0.3
@@ -1095,28 +1101,61 @@ init_camera :: proc(){
 		position = { 0,0,10 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
+		//how far ahead the camera is looking infront of the player
 		look_ahead = 0.6,
+
+		//spring forces has to be in order from weakest force to strongest force ( maybe auto sort these in the future )
+		spring_forces = {
+			{0.01, 0},
+			{0.025, 0.01},
+			{0.037, 0.04},
+			{0.05, 0.065}
+		},
+
+		//the spring for the camera
 		spring = Spring{
-			anchor = g.player.pos,
-			position = g.player.pos,
-			velocity = Vec2{0, 0},
-			restlength = 0.6,
-			spring_force = 0.03,
+			restlength = 0,
 			depletion = 0.5,
 		}
 	}
+
+	//set the camera spring and spring anchor position to the right one
+	look_ahead_pos := (g.player.pos+(g.player.move_dir * g.camera.look_ahead))
+	g.camera.spring.position = look_ahead_pos
+	g.camera.spring.anchor = look_ahead_pos
 }
 
+last_player_pos: Vec2
+current_player_pos: Vec2
+
+
 //follows a 2d position
-camera_follow :: proc(position: Vec2) {
+camera_follow :: proc(position: Vec2, look_ahead: f32) {
+
+	current_player_pos = g.player.pos
 
 	//pos camera wants to look at
-	look_ahead_pos := (position+(g.player.move_dir * g.camera.look_ahead))
-
+	look_ahead_pos := (position+(g.player.move_dir * look_ahead))
 	g.camera.spring.anchor = look_ahead_pos
+	
+	player_pos_difference := current_player_pos - last_player_pos
+
+	log.debug(get_vector_magnitude(player_pos_difference))
+
+	//change the spring force
+	for sf in g.camera.spring_forces{
+		if get_vector_magnitude(player_pos_difference) >= sf.threshold{
+			g.camera.spring.force = sf.force
+		}
+	}
+
+
 	update_spring_physics(&g.camera.spring)
 	g.camera.position = Vec3{g.camera.spring.position.x, g.camera.spring.position.y, g.camera.position.z}
 	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
+
+	last_player_pos = current_player_pos
+
 }
 
 //function for moving around camera
