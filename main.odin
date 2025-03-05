@@ -517,15 +517,15 @@ get_vector_magnitude :: proc(vec: Vec2) -> f32{
 }
 
 //spring physics
-update_spring_physics :: proc(spring: ^Spring){
+update_spring_physics :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
 	x := get_vector_magnitude(force) - spring.restlength
 	force = linalg.normalize0(force)
 	force *= -1 * spring.force * x
 	spring.velocity += force
-	spring.position += spring.velocity
-	spring.velocity *= spring.depletion
+	spring.position += spring.velocity * dt
+	spring.velocity *= spring.depletion * dt
 	
 }
 
@@ -872,7 +872,7 @@ update_game_state :: proc(dt: f32){
 	event_listener()
 	// move_camera_3D(dt)
 	update_player(dt)
-	camera_follow(dt, g.player.pos, g.camera.look_ahead, g.player.move_dir)
+	camera_follow(dt, g.player.pos, g.camera.lookahead, g.player.move_dir)
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
@@ -1099,9 +1099,11 @@ Camera :: struct{
 	target: Vec3,
 	look: Vec2,
 	spring: Spring,
-	look_ahead: f32,
+	lookahead: f32,
 	spring_forces: [dynamic]Spring_forces,
 	zoom: Camera_zoom,
+
+	lookahead_spring: Spring,
 }
 
 Spring_forces :: struct{
@@ -1121,11 +1123,11 @@ LOOK_SENSITIVITY :: 0.3
 init_camera :: proc(){
 	//setup the camera
 	g.camera = {
-		position = { 0,0,10 },
+		position = { 0,0,11 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
 		//how far ahead the camera is looking infront of the player
-		look_ahead = 0.4,
+		lookahead = 0.5,
 		//how much to zoom out, when to max out and how fast to zoom
 		zoom = {
 			max = 0.2,
@@ -1137,29 +1139,40 @@ init_camera :: proc(){
 		//the camera will go between these values smoothly
 		spring_forces = {
 			//when standing still
-			{0.02, 0},
+			{1.6, 0},
 			//when walking
-			{0.025, 0.01},
+			{4.2, 0.01},
 			//when sprinting
-			{0.037, 0.04},
+			{6.2, 0.04},
 			//max speed which is reached at 0.065
-			{0.05 , 0.065}
+			{8.3 , 0.065}
 		},
 
 		//the spring for the camera
 		spring = Spring{
 			restlength = 0,
-			depletion = 0.5,
+			depletion = 80,
+		},
+
+
+		//a spring for the lookahead of the camera
+		lookahead_spring = Spring{
+			restlength = 0,
+			depletion = 80,
+			force = 1,
 		}
+
 	}
 
 	//set the camera zoom position
 	g.camera.zoom.default = g.camera.position.z
 
 	//set the camera spring and spring anchor position to the right one
-	look_ahead_pos := (g.player.pos+(linalg.normalize0(g.player.move_dir) * g.camera.look_ahead))
-	g.camera.spring.position = look_ahead_pos
-	g.camera.spring.anchor = look_ahead_pos
+	g.camera.spring.position = g.player.pos
+	g.camera.spring.anchor = g.player.pos
+
+	g.camera.lookahead_spring.position = linalg.normalize0(g.player.move_dir) * g.camera.lookahead
+	g.camera.lookahead_spring.anchor = g.camera.lookahead_spring.position
 }
 
 last_pos: Vec2
@@ -1167,14 +1180,16 @@ current_pos: Vec2
 
 
 //follows a 2d position 
-camera_follow :: proc(dt: f32, position: Vec2, look_ahead: f32 = 0, look_ahead_dir: Vec2 = {0, 0}) {
+camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = {0, 0}) {
 
 	current_pos := position
 
 	//pos camera wants to look at
-	look_ahead_pos := (position+(linalg.normalize0(look_ahead_dir) * look_ahead))
-	g.camera.spring.anchor = look_ahead_pos
-	
+	lookahead_pos := (linalg.normalize0(lookahead_dir) * lookahead)
+	g.camera.lookahead_spring.anchor = lookahead_pos
+
+	g.camera.spring.anchor = position
+
 	//difference pos between last frame and this frame
 	pos_difference := current_pos - last_pos
 	//how fast the player is moving
@@ -1227,8 +1242,9 @@ camera_follow :: proc(dt: f32, position: Vec2, look_ahead: f32 = 0, look_ahead_d
 	}
 
 	//update the spring physics and update the camera position
-	update_spring_physics(&g.camera.spring)
-	update_camera_position(g.camera.spring.position)
+	update_spring_physics(&g.camera.spring, dt)
+	update_spring_physics(&g.camera.lookahead_spring, dt)
+	update_camera_position(g.camera.spring.position + g.camera.lookahead_spring.position)
 
 	last_pos = current_pos
 
