@@ -11,7 +11,8 @@ package main
 	animation system thing?, 
 	lighting,
 	camera shake,
-	player movement acceleration and deceleration
+	player movement acceleration and deceleration,
+	custom cursor
 */
 
 
