@@ -3,9 +3,16 @@ package main
 
 
 
-//
-// TODO: fix fonts, use hashmaps for things like the fonts?, fix updating text size
-//
+/*
+	TODO: 
+	use hashmaps for things like the fonts?, 
+	fix updating text size, 
+	sprite sheet rendering, 
+	animation system thing?, 
+	lighting,
+	camera shake,
+	player movement acceleration and deceleration
+*/
 
 
 
@@ -58,11 +65,17 @@ Object :: struct{
 }
 
 Spring :: struct{
+	//where the spring is attached
 	anchor: Vec2,
+	//where the spring end is at
 	position: Vec2,
+	//the velocity which affects the springs position
 	velocity: Vec2,
+	//at which length the spring wants to be at
 	restlength: f32,
+	//the "springyness"
 	force: f32,
+	//how much the springs velocity depletes ( how bouncy the spring is )
 	depletion: f32,
 }
 
@@ -851,15 +864,15 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	// init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
 
 	event_listener()
-	//move_camera_3D(dt)
+	// move_camera_3D(dt)
 	update_player(dt)
-	camera_follow(g.player.pos, g.camera.look_ahead)
+	camera_follow(dt, g.player.pos, g.camera.look_ahead, g.player.move_dir)
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
@@ -938,12 +951,14 @@ init_player :: proc(){
 }
 
 update_player :: proc(dt: f32) {
+	//changing the move_input with wasd
 	move_input: Vec2
 	if key_down[.W] do move_input.y = 1
 	else if key_down[.S] do move_input.y = -1
 	if key_down[.A] do move_input.x = -1
 	else if key_down[.D] do move_input.x = 1
 
+	//defining the definitions of up and right which in turn gives us the other directions
 	up := Vec2{0,1}
 	right := Vec2{1,0}
 
@@ -1085,12 +1100,20 @@ Camera :: struct{
 	look: Vec2,
 	spring: Spring,
 	look_ahead: f32,
-	spring_forces: [dynamic]Spring_forces
+	spring_forces: [dynamic]Spring_forces,
+	zoom: Camera_zoom,
 }
 
 Spring_forces :: struct{
 	force: f32,
 	threshold: f32,
+}
+
+Camera_zoom :: struct{
+	max: f32,
+	threshold: f32,
+	default: f32,
+	speed: f32,
 }
 
 LOOK_SENSITIVITY :: 0.3
@@ -1102,14 +1125,25 @@ init_camera :: proc(){
 		//what the camera is looking at
 		target = { 0,0,-1 },
 		//how far ahead the camera is looking infront of the player
-		look_ahead = 0.6,
+		look_ahead = 0.4,
+		//how much to zoom out, when to max out and how fast to zoom
+		zoom = {
+			max = 0.2,
+			threshold = 0.2,
+			speed = 1,
+		},
 
 		//spring forces has to be in order from weakest force to strongest force ( maybe auto sort these in the future )
+		//the camera will go between these values smoothly
 		spring_forces = {
-			{0.01, 0},
+			//when standing still
+			{0.02, 0},
+			//when walking
 			{0.025, 0.01},
+			//when sprinting
 			{0.037, 0.04},
-			{0.05, 0.065}
+			//max speed which is reached at 0.065
+			{0.05 , 0.065}
 		},
 
 		//the spring for the camera
@@ -1119,41 +1153,84 @@ init_camera :: proc(){
 		}
 	}
 
+	//set the camera zoom position
+	g.camera.zoom.default = g.camera.position.z
+
 	//set the camera spring and spring anchor position to the right one
-	look_ahead_pos := (g.player.pos+(g.player.move_dir * g.camera.look_ahead))
+	look_ahead_pos := (g.player.pos+(linalg.normalize0(g.player.move_dir) * g.camera.look_ahead))
 	g.camera.spring.position = look_ahead_pos
 	g.camera.spring.anchor = look_ahead_pos
 }
 
-last_player_pos: Vec2
-current_player_pos: Vec2
+last_pos: Vec2
+current_pos: Vec2
 
 
 //follows a 2d position 
-camera_follow :: proc(position: Vec2, look_ahead: f32) {
+camera_follow :: proc(dt: f32, position: Vec2, look_ahead: f32 = 0, look_ahead_dir: Vec2 = {0, 0}) {
 
-	current_player_pos = g.player.pos
+	current_pos := position
 
 	//pos camera wants to look at
-	look_ahead_pos := (position+(g.player.move_dir * look_ahead))
+	look_ahead_pos := (position+(linalg.normalize0(look_ahead_dir) * look_ahead))
 	g.camera.spring.anchor = look_ahead_pos
 	
-	player_pos_difference := current_player_pos - last_player_pos
+	//difference pos between last frame and this frame
+	pos_difference := current_pos - last_pos
+	//how fast the player is moving
+	move_mag := get_vector_magnitude(pos_difference)
 
-	//log.debug(get_vector_magnitude(player_pos_difference))
 
-	//change the spring force
-	for sf in g.camera.spring_forces{
-		if get_vector_magnitude(player_pos_difference) >= sf.threshold{
+	//change the spring force with a gradient between different values
+	for i := 0; i<len(g.camera.spring_forces); i+=1 {
+		//the current threshold and force values
+		sf := g.camera.spring_forces[i]
+		
+		if move_mag < sf.threshold do break
+		//if we are not in the last element of the array
+		if i < len(g.camera.spring_forces) -1 {
+			//the next threshold and force values
+			next_sf := g.camera.spring_forces[i+1]
+
+			//difference between the different thresholds
+			threshold_player_diff := move_mag - sf.threshold
+			threshold_diff := next_sf.threshold - sf.threshold
+
+			//how much of the threshold value we are at
+			gradient_index := threshold_player_diff/threshold_diff
+
+			//difference between the forces
+			force_diff := next_sf.force - sf.force
+
+			//adds a percentage of the next spring force dependent on our movement speed
+			g.camera.spring.force = sf.force + (force_diff * gradient_index)
+		//if we are in the last element of the aray. Means we are at the max values
+		} else {
 			g.camera.spring.force = sf.force
 		}
+	}
+
+	//change how much the camera is zoomed out ( depentent on movement speed )
+
+	zoom_threshold_diff := move_mag - g.camera.zoom.threshold
+	zoom_gradient_index := (zoom_threshold_diff/g.camera.zoom.threshold) + 1
+	if zoom_gradient_index > 1 do zoom_gradient_index = 1
+
+	//desired zoom position
+	zoom_zpos := g.camera.zoom.default + (g.camera.zoom.max * zoom_gradient_index)
+
+	//slowly moves the z pos of camera to the desired zoom position
+	if zoom_zpos > g.camera.position.z{
+		g.camera.position.z += g.camera.zoom.speed * dt
+	} else if zoom_zpos < g.camera.position.z{
+		g.camera.position.z -= g.camera.zoom.speed * dt
 	}
 
 	//update the spring physics and update the camera position
 	update_spring_physics(&g.camera.spring)
 	update_camera_position(g.camera.spring.position)
 
-	last_player_pos = current_player_pos
+	last_pos = current_pos
 
 }
 
