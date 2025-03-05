@@ -5,17 +5,26 @@ package main
 
 /*
 	TODO: 
+	
 	use hashmaps for things like the fonts?, 
 	fix updating text size, 
+	fix text being weird when changing z pos or perspective,
+
+
 	sprite sheet rendering, 
 	animation system thing?, 
-	lighting,
-	camera shake,
-	player movement acceleration and deceleration,
-	custom cursor,
-	fix text being weird when changing z pos or perspective,
+	
 	tilemap and other environment/map things,
-	collisions
+	lighting,
+	
+	camera shake,
+	
+	player movement acceleration and deceleration,
+	collisions,
+	
+	custom cursor,
+	make it so cursor cant go outside screen,
+	
 */
 
 
