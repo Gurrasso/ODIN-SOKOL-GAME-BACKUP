@@ -12,7 +12,10 @@ package main
 	lighting,
 	camera shake,
 	player movement acceleration and deceleration,
-	custom cursor
+	custom cursor,
+	fix text being weird when changing z pos or perspective,
+	tilemap and other environment/map things,
+	collisions
 */
 
 
@@ -93,6 +96,7 @@ Globals :: struct {
 	player: Player,
 	fonts: [dynamic]FONT_INFO,
 	text_objects: [dynamic]Text_object,
+	cursor: Cursor,
 }
 g: ^Globals
 
@@ -863,9 +867,11 @@ init_game_state :: proc(){
 
 	init_camera()
 
+	init_cursor()
+
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	// init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 }
 
 update_game_state :: proc(dt: f32){
@@ -873,7 +879,21 @@ update_game_state :: proc(dt: f32){
 	event_listener()
 	// move_camera_3D(dt)
 	update_player(dt)
-	camera_follow(dt, g.player.pos, g.camera.lookahead, g.player.move_dir)
+	update_cursor(dt)
+
+	//camera follows cursor
+
+	cursor_dir := g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y})
+
+	lookahead := get_vector_magnitude(cursor_dir)
+
+	lookahead = math.clamp(lookahead, -g.camera.lookahead_distance, g.camera.lookahead_distance)
+
+	lookahead /= g.camera.lookahead
+
+	camera_follow(dt, g.player.pos, lookahead, cursor_dir)
+
+	
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
@@ -929,6 +949,7 @@ Player :: struct{
 	size: Vec2,
 	rot: f32,
 	move_dir: Vec2,
+	look_dir: Vec2,
 	default_move_speed: f32,
 	move_speed: f32,
 }
@@ -947,7 +968,6 @@ init_player :: proc(){
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
-	init_rect(size = {1.6, 0.15}, pos2 = {0, -0.051})
 	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
 }
 
@@ -971,10 +991,13 @@ update_player :: proc(dt: f32) {
 		motion = linalg.normalize0(g.player.move_dir) * g.player.move_speed * dt
 	}
 
+	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	g.player.look_dir = g.player.move_dir
+
 	update_player_abilities(dt)
 
 	//creates a player rotation based of the movement
-	g.player.rot = linalg.to_degrees(math.atan2(g.player.move_dir.y, g.player.move_dir.x))
+	g.player.rot = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
 
 	
 
@@ -1093,6 +1116,29 @@ update_sprint :: proc(){
 	else do g.player.move_speed = g.player.default_move_speed
 }
 
+// CURSOR
+
+Cursor :: struct{
+	pos: Vec2,
+	rot: f32,
+	sensitivity: f32,
+}
+
+init_cursor :: proc(){
+	g.cursor = Cursor{
+		pos = { 0,0 },
+		rot = 0,
+		sensitivity = 2,
+	}
+
+	init_rect(size = {0.05, 0.05}, id = "cursor")
+}
+
+update_cursor :: proc(dt: f32){
+	g.cursor.pos += Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * dt
+	update_object(pos2 = Vec2{g.camera.position.x ,g.camera.position.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
+}
+
 // CAMERA
 
 Camera :: struct{
@@ -1100,6 +1146,7 @@ Camera :: struct{
 	target: Vec3,
 	look: Vec2,
 	spring: Spring,
+	lookahead_distance: f32,
 	lookahead: f32,
 	spring_forces: [dynamic]Spring_forces,
 	zoom: Camera_zoom,
@@ -1127,11 +1174,13 @@ init_camera :: proc(){
 		position = { 0,0,11 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
-		//how far ahead the camera is looking infront of the player
-		lookahead = 0.5,
+		//how far the mouse movement affects the lookahead of the camera
+		lookahead_distance = 4,
+		//divides the lookahead distance to get the actual lookahead of the camera
+		lookahead = 6,
 		//how much to zoom out, when to max out and how fast to zoom
 		zoom = {
-			max = 0.2,
+			max = 0,
 			threshold = 0.2,
 			speed = 1,
 		},
@@ -1160,7 +1209,7 @@ init_camera :: proc(){
 		lookahead_spring = Spring{
 			restlength = 0,
 			depletion = 80,
-			force = 1,
+			force = 25,
 		}
 
 	}
@@ -1168,12 +1217,15 @@ init_camera :: proc(){
 	//set the camera zoom position
 	g.camera.zoom.default = g.camera.position.z
 
-	//set the camera spring and spring anchor position to the right one
+	//set the camera positions to the player
+	g.camera.position.x = g.player.pos.x
+	g.camera.position.y = g.player.pos.y
+	g.camera.target.x = g.player.pos.x
+	g.camera.target.y = g.player.pos.y
 	g.camera.spring.position = g.player.pos
 	g.camera.spring.anchor = g.player.pos
-
-	g.camera.lookahead_spring.position = linalg.normalize0(g.player.move_dir) * g.camera.lookahead
-	g.camera.lookahead_spring.anchor = g.camera.lookahead_spring.position
+	g.camera.lookahead_spring.position = g.player.pos
+	g.camera.lookahead_spring.anchor = g.player.pos
 }
 
 last_pos: Vec2
@@ -1253,8 +1305,7 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 
 update_camera_position :: proc(position: Vec2){
 	g.camera.position = Vec3{position.x, position.y, g.camera.position.z}
-	g.camera.target = Vec3{g.camera.position.x ,g.camera.position.y, g.camera.target.z}
-
+	g.camera.target = Vec3{position.x ,position.y, g.camera.target.z}
 }
 
 //function for moving around camera in 3D
