@@ -15,7 +15,7 @@ package main
 	animation system thing?, 
 	
 	tilemap and other environment/map things,
-	lighting,
+	lighting(normalmaps),
 	
 	camera shake,
 	
@@ -23,7 +23,7 @@ package main
 	collisions,
 	
 	custom cursor,
-	make it so cursor cant go outside screen,
+		-make it so cursor cant go outside screen,
 	
 */
 
@@ -219,6 +219,7 @@ cleanup_cb :: proc "c" (){
 	//free the global vars
 	free(g)
 
+
 	//shut down sokol graphics
 	sg.shutdown()
 }
@@ -309,8 +310,6 @@ frame_cb :: proc "c" (){
 	sg.end_pass()
 
 	sg.commit()
-
-	mouse_move = {}
 }
 
 //
@@ -870,7 +869,7 @@ init_game_state :: proc(){
 
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
-	//sapp.toggle_fullscreen()
+
 
 	init_player()
 
@@ -889,23 +888,14 @@ update_game_state :: proc(dt: f32){
 	// move_camera_3D(dt)
 	update_player(dt)
 	update_cursor(dt)
-
-	//camera follows cursor
-
-	cursor_dir := g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y})
-
-	lookahead := get_vector_magnitude(cursor_dir)
-
-	lookahead = math.clamp(lookahead, -g.camera.lookahead_distance, g.camera.lookahead_distance)
-
-	lookahead /= g.camera.lookahead
-
-	camera_follow(dt, g.player.pos, lookahead, cursor_dir)
-
 	
+	camera_follow_cursor(dt)
+
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
+
+	mouse_move = {}
 }
 
 //proc for quiting the game
@@ -929,7 +919,7 @@ event_listener :: proc(){
 //check the player collision
 check_collision :: proc (){
 
-	wierd_const :: 7.6
+	wierd_const := (7.6/8)*g.camera.position.z
 	collision_offset := Vec2 {g.player.size.x/2, g.player.size.y/2}
 	screen_size_from_origin := Vec2 {sapp.widthf()/2, sapp.heightf()/2}
 	pixels_per_coord: f32 = sapp.heightf()/wierd_const
@@ -968,7 +958,7 @@ init_player :: proc(){
 	g.player = Player{
 		id = "Player",
 		sprite = "./source/assets/textures/Random.png",
-		pos = {-1.3, 0},
+		pos = {0, 0},
 		size ={1, 1},
 		rot = 0,
 		move_dir = {1, 0},
@@ -1131,6 +1121,7 @@ Cursor :: struct{
 	pos: Vec2,
 	rot: f32,
 	sensitivity: f32,
+	size: Vec2,
 }
 
 init_cursor :: proc(){
@@ -1138,14 +1129,56 @@ init_cursor :: proc(){
 		pos = { 0,0 },
 		rot = 0,
 		sensitivity = 2,
+		size = { 0.05,0.05 }
 	}
 
-	init_rect(size = {0.05, 0.05}, id = "cursor")
+	init_rect(size = g.cursor.size, id = "cursor")
 }
 
 update_cursor :: proc(dt: f32){
-	g.cursor.pos += Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * dt
+	g.cursor.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * dt)
+	check_cursor_collision()
 	update_object(pos2 = Vec2{g.camera.position.x ,g.camera.position.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
+}
+
+//check the cursor collision with the screen
+check_cursor_collision :: proc (){
+
+	wierd_const := (7.6/8)*g.camera.position.z
+	collision_offset := Vec2 {g.cursor.size.x/2, g.cursor.size.y/2}
+	screen_size_from_origin := Vec2 {sapp.widthf()/2, sapp.heightf()/2}
+	pixels_per_coord: f32 = sapp.heightf()/wierd_const
+
+
+
+	if g.cursor.pos.y + collision_offset.y > screen_size_from_origin.y/ pixels_per_coord{
+		g.cursor.pos.y = (screen_size_from_origin.y / pixels_per_coord) - collision_offset.y
+	} else if g.cursor.pos.y - collision_offset.y < -(screen_size_from_origin.y / pixels_per_coord){
+		g.cursor.pos.y = -screen_size_from_origin.y / pixels_per_coord + collision_offset.y
+	}
+	if g.cursor.pos.x + collision_offset.x > screen_size_from_origin.x/ pixels_per_coord{
+		g.cursor.pos.x = (screen_size_from_origin.x / pixels_per_coord) - collision_offset.x
+	} else if g.cursor.pos.x - collision_offset.x < -(screen_size_from_origin.x/ pixels_per_coord){
+		g.cursor.pos.x = -screen_size_from_origin.x / pixels_per_coord + collision_offset.x
+	}
+}
+
+camera_follow_cursor :: proc(dt: f32){
+	//camera follows cursor
+
+	cursor_dir := g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y})
+
+	lookahead := get_vector_magnitude(cursor_dir)
+
+	lookahead = math.clamp(lookahead, -g.camera.lookahead_distance, g.camera.lookahead_distance)
+
+	lookahead /= g.camera.lookahead
+
+	camera_follow(dt, g.player.pos, lookahead, cursor_dir)
+}
+
+camera_follow_player :: proc(dt: f32){
+	camera_follow(dt, g.player.pos, 0, Vec2{0, 0})
 }
 
 // CAMERA
@@ -1200,11 +1233,11 @@ init_camera :: proc(){
 			//when standing still
 			{1.6, 0},
 			//when walking
-			{4.2, 0.01},
+			{4.2, 0.0002},
 			//when sprinting
-			{6.2, 0.04},
-			//max speed which is reached at 0.065
-			{8.3 , 0.065}
+			{6.2, 0.00035},
+			//max speed
+			{8.3, 0.0004}
 		},
 
 		//the spring for the camera
@@ -1220,7 +1253,6 @@ init_camera :: proc(){
 			depletion = 80,
 			force = 25,
 		}
-
 	}
 
 	//set the camera zoom position
@@ -1255,8 +1287,7 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 	//difference pos between last frame and this frame
 	pos_difference := current_pos - last_pos
 	//how fast the player is moving
-	move_mag := get_vector_magnitude(pos_difference)
-
+	move_mag := get_vector_magnitude(pos_difference) * dt
 
 	//change the spring force with a gradient between different values
 	for i := 0; i<len(g.camera.spring_forces); i+=1 {
