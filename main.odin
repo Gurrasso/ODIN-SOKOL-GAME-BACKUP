@@ -1231,13 +1231,13 @@ init_camera :: proc(){
 		//the camera will go between these values smoothly
 		spring_forces = {
 			//when standing still
-			{1.6, 0},
+			{8, 0},
 			//when walking
-			{4.2, 0.0002},
+			{8, 0.0002},
 			//when sprinting
-			{6.2, 0.00035},
+			{10, 0.00035},
 			//max speed
-			{8.3, 0.0004}
+			{12, 0.0004}
 		},
 
 		//the spring for the camera
