@@ -922,7 +922,7 @@ event_listener :: proc(){
 	}
 
 	if listen_key_down(.F){
-		g.camera.camera_shake.trauma = 0.2
+		g.camera.camera_shake.trauma = 2
 	}
 }
 
@@ -1416,11 +1416,11 @@ Camera_shake :: struct {
 init_camera_shake :: proc(){
 	g.camera.camera_shake = Camera_shake{
 		trauma = 0,
-		depletion = 1,
+		depletion = 6,
 		pos_offset = { 0,0 },
 		rot_offset = 0,
 		seed = 27193,
-		time_offset = {4, 4}
+		time_offset = {6, 6}
 	}
 }
 
@@ -1432,13 +1432,10 @@ update_camera_shake :: proc(dt: f32){
 	} else {
 		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
 
-		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
+		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)} / 30
 		cs.pos_offset *= cs.trauma * cs.trauma
-		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
+		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos) / 30
 		cs.rot_offset *= cs.trauma * cs.trauma
-
-		log.debug(g.camera.rotation)
-
 
 		cs.trauma -= cs.depletion * dt
 	}
