@@ -1132,6 +1132,7 @@ Cursor :: struct{
 	rot: f32,
 	sensitivity: f32,
 	size: Vec2,
+	filename: cstring,
 }
 
 init_cursor :: proc(){
@@ -1139,16 +1140,17 @@ init_cursor :: proc(){
 		pos = { 0,0 },
 		rot = 0,
 		sensitivity = 2,
-		size = { 0.05,0.05 }
+		size = { 0.25,0.25 },
+		filename = "./source/assets/sprites/Cursor2.png",
 	}
 
-	init_rect(size = g.cursor.size, id = "cursor")
+	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor")
 }
 
 update_cursor :: proc(dt: f32){
 	g.cursor.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * dt)
 	check_cursor_collision()
-	update_object(pos2 = Vec2{g.camera.position.x ,g.camera.position.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
+	update_sprite(pos2 = Vec2{g.camera.position.x ,g.camera.position.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
 }
 
 //check the cursor collision with the screen
@@ -1420,7 +1422,7 @@ init_camera_shake :: proc(){
 		pos_offset = { 0,0 },
 		rot_offset = 0,
 		seed = 27193,
-		time_offset = {6, 6}
+		time_offset = {7.5, 7.5}
 	}
 }
 
