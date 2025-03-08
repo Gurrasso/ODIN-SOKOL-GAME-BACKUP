@@ -17,7 +17,7 @@ package main
 	tilemap and other environment/map things,
 	lighting(normalmaps),
 	
-	camera shake,
+		-camera shake,
 	
 	player movement acceleration and deceleration,
 	collisions,
@@ -37,6 +37,7 @@ import "base:runtime"
 import "core:log"
 import "core:math"
 import "core:math/linalg"
+import "core:math/noise"
 import "core:mem"
 import "core:os"
 // stb
@@ -106,6 +107,7 @@ Globals :: struct {
 	fonts: [dynamic]FONT_INFO,
 	text_objects: [dynamic]Text_object,
 	cursor: Cursor,
+	runtime: f32,
 }
 g: ^Globals
 
@@ -249,10 +251,12 @@ frame_cb :: proc "c" (){
 	//apply the pipeline to the sokol graphics
 	sg.apply_pipeline(g.pipeline)
 
+	camera_zrotation := g.camera.rotation
+
 	//do things for all objects
 	for obj in g.objects {
 		//matrix
-		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
 
 
 		b := sg.Bindings {
@@ -282,7 +286,7 @@ frame_cb :: proc "c" (){
 			//matrix
 
 			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
-			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
 	
 	
 			b := sg.Bindings {
@@ -536,8 +540,9 @@ update_spring_physics :: proc(spring: ^Spring, dt: f32){
 	x := get_vector_magnitude(force) - spring.restlength
 	force = linalg.normalize0(force)
 	force *= -1 * spring.force * x
-	spring.velocity += force
-	spring.position += spring.velocity * dt
+	force *= dt
+	spring.velocity = force
+	spring.position += spring.velocity
 	spring.velocity *= spring.depletion * dt
 	
 }
@@ -889,13 +894,14 @@ update_game_state :: proc(dt: f32){
 	update_player(dt)
 	update_cursor(dt)
 	
-	camera_follow_cursor(dt)
+	update_camera(dt)
 
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
 
 	mouse_move = {}
+	g.runtime += dt
 }
 
 //proc for quiting the game
@@ -913,6 +919,10 @@ event_listener :: proc(){
 	//fullscreen on F11
 	if listen_key_single_down(.F11) {
 		sapp.toggle_fullscreen()
+	}
+
+	if listen_key_down(.F){
+		g.camera.camera_shake.trauma = 0.2
 	}
 }
 
@@ -1184,6 +1194,7 @@ camera_follow_player :: proc(dt: f32){
 // CAMERA
 
 Camera :: struct{
+	rotation: f32,
 	position: Vec3,
 	target: Vec3,
 	look: Vec2,
@@ -1194,6 +1205,8 @@ Camera :: struct{
 	zoom: Camera_zoom,
 
 	lookahead_spring: Spring,
+
+	camera_shake: Camera_shake,
 }
 
 Spring_forces :: struct{
@@ -1213,6 +1226,7 @@ LOOK_SENSITIVITY :: 0.3
 init_camera :: proc(){
 	//setup the camera
 	g.camera = {
+		rotation = 0,
 		position = { 0,0,11 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
@@ -1267,6 +1281,9 @@ init_camera :: proc(){
 	g.camera.spring.anchor = g.player.pos
 	g.camera.lookahead_spring.position = g.player.pos
 	g.camera.lookahead_spring.anchor = g.player.pos
+
+	init_camera_shake()
+
 }
 
 last_pos: Vec2
@@ -1337,15 +1354,23 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 	//update the spring physics and update the camera position
 	update_spring_physics(&g.camera.spring, dt)
 	update_spring_physics(&g.camera.lookahead_spring, dt)
-	update_camera_position(g.camera.spring.position + g.camera.lookahead_spring.position)
 
 	last_pos = current_pos
 
 }
 
-update_camera_position :: proc(position: Vec2){
+update_camera_position :: proc(position: Vec2, rotation: f32){
 	g.camera.position = Vec3{position.x, position.y, g.camera.position.z}
 	g.camera.target = Vec3{position.x ,position.y, g.camera.target.z}
+	g.camera.rotation = rotation
+}
+
+update_camera :: proc(dt: f32){
+	update_camera_shake(dt)
+
+	camera_follow_cursor(dt)
+
+	update_camera_position(g.camera.spring.position + g.camera.lookahead_spring.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
 }
 
 //function for moving around camera in 3D
@@ -1372,4 +1397,49 @@ move_camera_3D :: proc(dt: f32) {
 	g.camera.position += motion
 
 	g.camera.target = g.camera.position + forward
+}
+
+
+// 
+// CAMERA SHAKE
+// 
+
+Camera_shake :: struct {
+	trauma: f32,
+	depletion: f32,
+	pos_offset: Vec2,
+	rot_offset: f32,
+	seed: i64,
+	time_offset: Vec2,
+}
+
+init_camera_shake :: proc(){
+	g.camera.camera_shake = Camera_shake{
+		trauma = 0,
+		depletion = 1,
+		pos_offset = { 0,0 },
+		rot_offset = 0,
+		seed = 27193,
+		time_offset = {4, 4}
+	}
+}
+
+update_camera_shake :: proc(dt: f32){
+	cs := &g.camera.camera_shake
+	if cs.trauma <= 0{
+		cs.pos_offset = { 0,0 }
+		cs.rot_offset = 0
+	} else {
+		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
+
+		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
+		cs.pos_offset *= cs.trauma * cs.trauma
+		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
+		cs.rot_offset *= cs.trauma * cs.trauma
+
+		log.debug(g.camera.rotation)
+
+
+		cs.trauma -= cs.depletion * dt
+	}
 }
