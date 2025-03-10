@@ -67,6 +67,7 @@ Vec4 :: [4]f32
 Draw_data :: struct{
 	m: Matrix4,
 	b: sg.Bindings,
+	// the priority of an obj, basically just says higher priority, draw first
 	priority: i32,
 }
 
