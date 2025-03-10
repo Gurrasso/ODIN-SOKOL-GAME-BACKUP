@@ -41,6 +41,7 @@ import "core:math/noise"
 import "core:math/ease"
 import "core:mem"
 import "core:os"
+import "core:sort"
 // stb
 import stbi "vendor:stb/image"
 import stbtt "vendor:stb/truetype"
@@ -62,6 +63,13 @@ Vec2 :: [2]f32
 Vec3 :: [3]f32
 Vec4 :: [4]f32
 
+//draw call data
+Draw_data :: struct{
+	m: Matrix4,
+	b: sg.Bindings,
+	priority: i32,
+}
+
 // the vertex data
 Vertex_Data :: struct{
 	pos: Vec3,
@@ -77,6 +85,7 @@ Object :: struct{
 	img: sg.Image,
 	vertex_buffer: sg.Buffer,
 	id: cstring,
+	priority: i32,
 }
 
 Spring :: struct{
@@ -254,32 +263,7 @@ frame_cb :: proc "c" (){
 
 	camera_zrotation := g.camera.rotation
 
-	//do things for all objects
-	for obj in g.objects {
-		//matrix
-		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
-
-
-		b := sg.Bindings {
-			vertex_buffers = { 0 = obj.vertex_buffer },
-			index_buffer = g.index_buffer,
-			images = { IMG_tex = obj.img },
-			samplers = { SMP_smp = g.sampler },
-		}
-
-		//apply the bindings(something that says which things we want to draw)
-		
-
-		sg.apply_bindings(b)
-
-		//apply uniforms
-		sg.apply_uniforms(UB_vs_params, sg_range(&Vs_Params{
-			mvp = p * v * m
-		}))
-
-		//drawing
-		sg.draw(0, 6, 1)
-	}
+	draw_data: [dynamic]Draw_data
 
 	//do things for all text objects
 	for text_object in g.text_objects {
@@ -290,26 +274,56 @@ frame_cb :: proc "c" (){
 			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
 	
 	
+			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
 				vertex_buffers = { 0 = obj.vertex_buffer },
 				index_buffer = g.index_buffer,
 				images = { IMG_tex = obj.img },
 				samplers = { SMP_smp = g.sampler },
 			}
-	
-			//apply the bindings(something that says which things we want to draw)
-			
-	
-			sg.apply_bindings(b)
-	
-			//apply uniforms
-			sg.apply_uniforms(UB_vs_params, sg_range(&Vs_Params{
-				mvp = p * v * m
-			}))
-	
-			//drawing
-			sg.draw(0, 6, 1)
+
+			append(&draw_data, Draw_data{
+				m = m,
+				b = b,
+				priority = text_object.priority,
+			})
 		}
+	}
+
+	//do things for all objects
+	for obj in g.objects {
+		//matrix
+		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
+
+		//apply the bindings(something that says which things we want to draw)
+		b := sg.Bindings {
+			vertex_buffers = { 0 = obj.vertex_buffer },
+			index_buffer = g.index_buffer,
+			images = { IMG_tex = obj.img },
+			samplers = { SMP_smp = g.sampler },
+		}
+
+		append(&draw_data, Draw_data{
+			m = m,
+			b = b,
+			priority = obj.priority,
+		})
+		
+	}
+
+	//sort the array based on priority
+	sort.quick_sort_proc(draw_data[:], compare_draw_data_priority)
+
+	for drt in draw_data {
+		sg.apply_bindings(drt.b)
+
+		//apply uniforms
+		sg.apply_uniforms(UB_vs_params, sg_range(&Vs_Params{
+			mvp = p * v * drt.m
+		}))
+
+		//drawing
+		sg.draw(0, 6, 1)
 	}
 
 	sg.end_pass()
@@ -387,6 +401,10 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 // UTILS
 //
 
+//used to sort the draw data based on priority
+compare_draw_data_priority :: proc(drt: Draw_data, drt2: Draw_data) -> int{
+	return int(drt.priority-drt2.priority)
+}
 
 //sg range utils
 sg_range :: proc {
@@ -567,7 +585,7 @@ WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0, priority: i32 = 1){
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -578,7 +596,8 @@ init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, si
 		{0, 0, 0},
 		WHITE_IMAGE,
 		vertex_buffer,
-		id
+		id,
+		priority,
 	})
 }
 
@@ -595,7 +614,7 @@ update_object :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0){
+init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0, priority: i32 = 1){
 
 
 	//color offset
@@ -613,6 +632,7 @@ init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.
 		load_image(filename),
 		vertex_buffer,
 		id,
+		priority,
 	})
 }
 
@@ -645,6 +665,7 @@ Text_object :: struct{
 	pos: Vec2,
 	rot: Vec3,
 	id: cstring,
+	priority: i32,
 }
 
 FONT_INFO :: struct {
@@ -660,7 +681,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, priority: i32 = 1) {
 	using stbtt
 
 	rotation : Vec3 = {0, 0, text_rot}
@@ -719,11 +740,11 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		y += -advance_y
 	}
 
-	append_text_object(rotation, text_objects, text_object_id, pos)
+	append_text_object(rotation, text_objects, text_object_id, pos, priority)
 	
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2){
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2, priority: i32){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
@@ -760,6 +781,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 		text_center,
 		text_rot,
 		text_object_id,
+		priority,
 	})
 
 	//show the center point of the text
@@ -892,11 +914,12 @@ init_game_state :: proc(){
 
 	init_camera()
 
-	init_cursor()
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	
+	init_cursor()
 }
 
 update_game_state :: proc(dt: f32){
@@ -904,13 +927,14 @@ update_game_state :: proc(dt: f32){
 	event_listener()
 	// move_camera_3D(dt)
 	update_player(dt)
-	update_cursor(dt)
-	
+
 	update_camera(dt)
 
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
+
+	update_cursor(dt)
 
 	mouse_move = {}
 	g.runtime += dt
@@ -1156,7 +1180,8 @@ init_cursor :: proc(){
 		filename = "./source/assets/sprites/Cursor2.png",
 	}
 
-	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor")
+	priority: i32 = 10
+	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor", priority = priority)
 }
 
 update_cursor :: proc(dt: f32){
