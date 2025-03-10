@@ -38,6 +38,7 @@ import "core:log"
 import "core:math"
 import "core:math/linalg"
 import "core:math/noise"
+import "core:math/ease"
 import "core:mem"
 import "core:os"
 // stb
@@ -534,7 +535,20 @@ get_vector_magnitude :: proc(vec: Vec2) -> f32{
 }
 
 //spring physics
-update_spring_physics :: proc(spring: ^Spring, dt: f32){
+update_spring :: proc(spring: ^Spring, dt: f32){
+
+	force := spring.position - spring.anchor
+	x := get_vector_magnitude(force) - spring.restlength
+	force = linalg.normalize0(force)
+	force *= -1 * spring.force * x
+	spring.velocity += force * dt
+	spring.position += spring.velocity
+	spring.velocity *= spring.depletion * dt
+	
+}
+
+//spring physics
+update_weird_spring :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
 	x := get_vector_magnitude(force) - spring.restlength
@@ -543,8 +557,6 @@ update_spring_physics :: proc(spring: ^Spring, dt: f32){
 	force *= dt
 	spring.velocity = force
 	spring.position += spring.velocity
-	spring.velocity *= spring.depletion * dt
-	
 }
 
 //
@@ -922,7 +934,7 @@ event_listener :: proc(){
 	}
 
 	if listen_key_down(.F){
-		g.camera.camera_shake.trauma = 2
+		g.camera.camera_shake.trauma = 1.3
 	}
 }
 
@@ -1354,8 +1366,8 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 	}
 
 	//update the spring physics and update the camera position
-	update_spring_physics(&g.camera.spring, dt)
-	update_spring_physics(&g.camera.lookahead_spring, dt)
+	update_weird_spring(&g.camera.spring, dt)
+	update_weird_spring(&g.camera.lookahead_spring, dt)
 
 	last_pos = current_pos
 
@@ -1418,7 +1430,7 @@ Camera_shake :: struct {
 init_camera_shake :: proc(){
 	g.camera.camera_shake = Camera_shake{
 		trauma = 0,
-		depletion = 6,
+		depletion = 8,
 		pos_offset = { 0,0 },
 		rot_offset = 0,
 		seed = 27193,
@@ -1431,12 +1443,15 @@ update_camera_shake :: proc(dt: f32){
 	if cs.trauma <= 0{
 		cs.pos_offset = { 0,0 }
 		cs.rot_offset = 0
+		cs.trauma = 0
 	} else {
 		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
 
-		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)} / 30
+		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
+		cs.pos_offset /= 30
 		cs.pos_offset *= cs.trauma * cs.trauma
-		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos) / 30
+		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
+		cs.rot_offset /= 20
 		cs.rot_offset *= cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * dt
