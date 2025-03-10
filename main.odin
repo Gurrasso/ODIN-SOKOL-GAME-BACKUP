@@ -1202,7 +1202,7 @@ camera_follow_cursor :: proc(dt: f32){
 }
 
 camera_follow_player :: proc(dt: f32){
-	camera_follow(dt, g.player.pos, 0, Vec2{0, 0})
+	camera_follow(dt, g.player.pos, 0, g.player.look_dir)
 }
 
 // CAMERA
@@ -1255,17 +1255,17 @@ init_camera :: proc(){
 			speed = 1,
 		},
 
-		//spring forces has to be in order from weakest force to strongest force ( maybe auto sort these in the future )
+		//spring forces has to be in order
 		//the camera will go between these values smoothly
 		spring_forces = {
 			//when standing still
-			{8, 0},
+			{14, 0},
 			//when walking
-			{8, 0.0002},
+			{11, 0.0002},
 			//when sprinting
-			{10, 0.00035},
+			{13, 0.00035},
 			//max speed
-			{12, 0.0004}
+			{16, 0.0004}
 		},
 
 		//the spring for the camera
