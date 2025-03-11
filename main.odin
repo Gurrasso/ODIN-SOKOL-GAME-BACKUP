@@ -1240,9 +1240,9 @@ init_cursor :: proc(){
 		//cursor sprite path
 		filename = "./source/assets/sprites/Cursor2.png",
 		//how far the mouse movement affects the lookahead of the camera
-		lookahead_distance = 3.6,
+		lookahead_distance = 10,
 		//divides the lookahead distance to get the actual lookahead of the camera
-		lookahead = 7,
+		lookahead = 13,
 	}
 
 	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor", draw_priority = draw_layers.cursor)
