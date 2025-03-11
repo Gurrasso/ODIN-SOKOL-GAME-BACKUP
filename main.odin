@@ -16,9 +16,10 @@ package main
 	
 	tilemap and other environment/map things,
 	lighting(normalmaps),
+	antialiasing,
 	
 		-camera shake,
-	replace wierd springs with asympatic averaging
+		-replace wierd springs with asympatic averaging,
 	
 	player movement acceleration and deceleration,
 	collisions,
@@ -68,8 +69,8 @@ Vec4 :: [4]f32
 Draw_data :: struct{
 	m: Matrix4,
 	b: sg.Bindings,
-	// the priority of an obj, basically just says higher priority, draw first
-	priority: i32,
+	// the draw_priority of an obj, basically just says higher draw_priority, draw last(on top)
+	draw_priority: i32,
 }
 
 Asympatic_object :: struct{
@@ -93,7 +94,7 @@ Object :: struct{
 	img: sg.Image,
 	vertex_buffer: sg.Buffer,
 	id: cstring,
-	priority: i32,
+	draw_priority: i32,
 }
 
 Spring :: struct{
@@ -178,32 +179,43 @@ init_cb :: proc "c" (){
 	g = new(Globals)
 
 	init_game_state()
-		
+
 	//make the shader and pipeline
 	g.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
-	g.pipeline = sg.make_pipeline({
+	pipeline_desc : sg.Pipeline_Desc = {
 		shader = g.shader,
 		layout = {
 			//different attributes
 			attrs = {
-				ATTR_main_pos = { format = .FLOAT3 },
-				ATTR_main_col = { format = .FLOAT4 },
-				ATTR_main_uv = { format = .FLOAT2 },
-				ATTR_main_bytes0 = { format = .UBYTE4N },
+			ATTR_main_pos = { format = .FLOAT3 },
+			ATTR_main_col = { format = .FLOAT4 },
+			ATTR_main_uv = { format = .FLOAT2 },
+			ATTR_main_bytes0 = { format = .UBYTE4N },
 			}
 		},
-
+		
 		// specify that we want to use index buffer
 		index_type = .UINT16,
 		//make it so objects draw based on distance from camera
 		depth = {
 			write_enabled = true,
 			compare = .LESS_EQUAL
-		}
-	})
-
-
+		},
+	}
 	
+	//the blend state for working with alphas
+	blend_state : sg.Blend_State = {
+		enabled = true,
+		src_factor_rgb = .SRC_ALPHA,
+		dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
+		op_rgb = .ADD,
+		src_factor_alpha = .ONE,
+		dst_factor_alpha = .ONE_MINUS_SRC_ALPHA,
+		op_alpha = .ADD,
+	}
+	
+	pipeline_desc.colors[0] = { blend = blend_state}
+	g.pipeline = sg.make_pipeline(pipeline_desc)
 
 	// indices
 	indices := []u16 {
@@ -226,11 +238,18 @@ init_cb :: proc "c" (){
 cleanup_cb :: proc "c" (){
 	context = default_context
 
-	//destroy all the things we init
+	// DESTROY!!!
 	for obj in g.objects{
 		sg.destroy_buffer(obj.vertex_buffer)
 		sg.destroy_image(obj.img)
 	}
+	for text_object in g.text_objects{
+		for obj in text_object.objects{
+			sg.destroy_buffer(obj.vertex_buffer)
+			sg.destroy_image(obj.img)
+		}
+	}
+
 	sg.destroy_sampler(g.sampler)
 	sg.destroy_buffer(g.index_buffer)
 	sg.destroy_pipeline(g.pipeline)
@@ -293,7 +312,7 @@ frame_cb :: proc "c" (){
 			append(&draw_data, Draw_data{
 				m = m,
 				b = b,
-				priority = text_object.priority,
+				draw_priority = text_object.draw_priority,
 			})
 		}
 	}
@@ -314,13 +333,13 @@ frame_cb :: proc "c" (){
 		append(&draw_data, Draw_data{
 			m = m,
 			b = b,
-			priority = obj.priority,
+			draw_priority = obj.draw_priority,
 		})
 		
 	}
 
-	//sort the array based on priority
-	sort.quick_sort_proc(draw_data[:], compare_draw_data_priority)
+	//sort the array based on draw_priority
+	sort.quick_sort_proc(draw_data[:], compare_draw_data_draw_priority)
 
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
@@ -409,9 +428,9 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 // UTILS
 //
 
-//used to sort the draw data based on priority
-compare_draw_data_priority :: proc(drt: Draw_data, drt2: Draw_data) -> int{
-	return int(drt.priority-drt2.priority)
+//used to sort the draw data based on draw_priority
+compare_draw_data_draw_priority :: proc(drt: Draw_data, drt2: Draw_data) -> int{
+	return int(drt.draw_priority-drt2.draw_priority)
 }
 
 //sg range utils
@@ -574,7 +593,7 @@ update_spring :: proc(spring: ^Spring, dt: f32){
 }
 
 //uses springs to do something similar to spring physics but without the springiness. It's more like something like Asympatic averaging.
-update_weird_spring :: proc(spring: ^Spring, dt: f32){
+update_asympatic_spring :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
 	x := get_vector_magnitude(force) - spring.restlength
@@ -602,7 +621,7 @@ WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0, priority: i32 = 1){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0, draw_priority: i32 = draw_layers.default){
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -614,7 +633,7 @@ init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, si
 		WHITE_IMAGE,
 		vertex_buffer,
 		id,
-		priority,
+		draw_priority,
 	})
 }
 
@@ -631,7 +650,7 @@ update_object :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0, priority: i32 = 1){
+init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0, draw_priority: i32 = draw_layers.default){
 
 
 	//color offset
@@ -649,7 +668,7 @@ init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.
 		load_image(filename),
 		vertex_buffer,
 		id,
-		priority,
+		draw_priority,
 	})
 }
 
@@ -661,6 +680,24 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 			obj.rot = {rot3.x, rot3.y, rot3.z}
 		}
 	}
+}
+
+//  DRAW_LAYERS
+
+//a struct that defines layers with different draw priority
+Layers :: struct{
+	default: i32,
+	text: i32,
+	cursor: i32,
+}
+
+draw_layers := Layers{
+	//default layer
+	default = 1,
+	//text layer
+	text = 3,
+	//cursor layer
+	cursor = 10,
 }
 
 
@@ -682,7 +719,7 @@ Text_object :: struct{
 	pos: Vec2,
 	rot: Vec3,
 	id: cstring,
-	priority: i32,
+	draw_priority: i32,
 }
 
 FONT_INFO :: struct {
@@ -698,7 +735,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, priority: i32 = 2) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text) {
 	using stbtt
 
 	rotation : Vec3 = {0, 0, text_rot}
@@ -757,11 +794,11 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		y += -advance_y
 	}
 
-	append_text_object(rotation, text_objects, text_object_id, pos, priority)
+	append_text_object(rotation, text_objects, text_object_id, pos, draw_priority)
 	
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2, priority: i32){
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2, draw_priority: i32){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
@@ -798,7 +835,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 		text_center,
 		text_rot,
 		text_object_id,
-		priority,
+		draw_priority,
 	})
 
 	//show the center point of the text
@@ -1186,19 +1223,29 @@ Cursor :: struct{
 	sensitivity: f32,
 	size: Vec2,
 	filename: cstring,
+	lookahead_distance: f32,
+	lookahead: f32,
 }
 
 init_cursor :: proc(){
 	g.cursor = Cursor{
+		//cursor position
 		pos = { 0,0 },
+		//cursor rotation
 		rot = 0,
+		//sensitivity
 		sensitivity = 2,
+		//size of the cursor
 		size = { 0.25,0.25 },
+		//cursor sprite path
 		filename = "./source/assets/sprites/Cursor2.png",
+		//how far the mouse movement affects the lookahead of the camera
+		lookahead_distance = 4,
+		//divides the lookahead distance to get the actual lookahead of the camera
+		lookahead = 6,
 	}
 
-	priority: i32 = 10
-	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor", priority = priority)
+	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor", draw_priority = draw_layers.cursor)
 }
 
 update_cursor :: proc(dt: f32){
@@ -1236,15 +1283,15 @@ camera_follow_cursor :: proc(dt: f32){
 
 	lookahead := get_vector_magnitude(cursor_dir)
 
-	lookahead = math.clamp(lookahead, -g.camera.lookahead_distance, g.camera.lookahead_distance)
+	lookahead = math.clamp(lookahead, -g.cursor.lookahead_distance, g.cursor.lookahead_distance)
 
-	lookahead /= g.camera.lookahead
+	lookahead /= g.cursor.lookahead
 
 	camera_follow(dt, g.player.pos, lookahead, cursor_dir)
 }
 
-camera_follow_player :: proc(dt: f32){
-	camera_follow(dt, g.player.pos, 0, g.player.look_dir)
+camera_follow_player :: proc(dt: f32, lookahead: f32 = 0){
+	camera_follow(dt, g.player.pos, lookahead, g.player.look_dir)
 }
 
 // CAMERA
@@ -1254,19 +1301,18 @@ Camera :: struct{
 	position: Vec3,
 	target: Vec3,
 	look: Vec2,
-	spring: Spring,
-	lookahead_distance: f32,
-	lookahead: f32,
-	spring_forces: [dynamic]Spring_forces,
+	//an object for the asympatic averaging of the camera movement
+	asym_obj: Asympatic_object,
+	asym_forces: [dynamic]Asympatic_depletion,
 	zoom: Camera_zoom,
 
-	lookahead_spring: Spring,
+	lookahead_asym_obj: Asympatic_object,
 
 	camera_shake: Camera_shake,
 }
 
-Spring_forces :: struct{
-	force: f32,
+Asympatic_depletion :: struct{
+	depletion: f32,
 	threshold: f32,
 }
 
@@ -1286,10 +1332,6 @@ init_camera :: proc(){
 		position = { 0,0,11 },
 		//what the camera is looking at
 		target = { 0,0,-1 },
-		//how far the mouse movement affects the lookahead of the camera
-		lookahead_distance = 4,
-		//divides the lookahead distance to get the actual lookahead of the camera
-		lookahead = 6,
 		//how much to zoom out, when to max out and how fast to zoom
 		zoom = {
 			max = 0,
@@ -1299,7 +1341,7 @@ init_camera :: proc(){
 
 		//spring forces has to be in order
 		//the camera will go between these values smoothly
-		spring_forces = {
+		asym_forces = {
 			//when standing still
 			{14, 0},
 			//when walking
@@ -1310,18 +1352,10 @@ init_camera :: proc(){
 			{16, 0.0004}
 		},
 
-		//the spring for the camera
-		spring = Spring{
-			restlength = 0,
-			depletion = 80,
-		},
-
 
 		//a spring for the lookahead of the camera
-		lookahead_spring = Spring{
-			restlength = 0,
-			depletion = 80,
-			force = 25,
+		lookahead_asym_obj = Asympatic_object{
+			depletion = 25,
 		}
 	}
 
@@ -1333,10 +1367,10 @@ init_camera :: proc(){
 	g.camera.position.y = g.player.pos.y
 	g.camera.target.x = g.player.pos.x
 	g.camera.target.y = g.player.pos.y
-	g.camera.spring.position = g.player.pos
-	g.camera.spring.anchor = g.player.pos
-	g.camera.lookahead_spring.position = g.player.pos
-	g.camera.lookahead_spring.anchor = g.player.pos
+	g.camera.asym_obj.position = g.player.pos
+	g.camera.asym_obj.destination = g.player.pos
+	g.camera.lookahead_asym_obj.position = g.player.pos
+	g.camera.lookahead_asym_obj.destination = g.player.pos
 
 	init_camera_shake()
 
@@ -1353,9 +1387,9 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 
 	//pos camera wants to look at
 	lookahead_pos := (linalg.normalize0(lookahead_dir) * lookahead)
-	g.camera.lookahead_spring.anchor = lookahead_pos
+	g.camera.lookahead_asym_obj.destination = lookahead_pos
 
-	g.camera.spring.anchor = position
+	g.camera.asym_obj.destination = position
 
 	//difference pos between last frame and this frame
 	pos_difference := current_pos - last_pos
@@ -1363,15 +1397,15 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 	move_mag := get_vector_magnitude(pos_difference) * dt
 
 	//change the spring force with a gradient between different values
-	for i := 0; i<len(g.camera.spring_forces); i+=1 {
+	for i := 0; i<len(g.camera.asym_forces); i+=1 {
 		//the current threshold and force values
-		sf := g.camera.spring_forces[i]
+		sf := g.camera.asym_forces[i]
 		
 		if move_mag < sf.threshold do break
 		//if we are not in the last element of the array
-		if i < len(g.camera.spring_forces) -1 {
+		if i < len(g.camera.asym_forces) -1 {
 			//the next threshold and force values
-			next_sf := g.camera.spring_forces[i+1]
+			next_sf := g.camera.asym_forces[i+1]
 
 			//difference between the different thresholds
 			threshold_player_diff := move_mag - sf.threshold
@@ -1381,13 +1415,13 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 			gradient_index := threshold_player_diff/threshold_diff
 
 			//difference between the forces
-			force_diff := next_sf.force - sf.force
+			force_diff := next_sf.depletion - sf.depletion
 
 			//adds a percentage of the next spring force dependent on our movement speed
-			g.camera.spring.force = sf.force + (force_diff * gradient_index)
+			g.camera.asym_obj.depletion = sf.depletion + (force_diff * gradient_index)
 		//if we are in the last element of the aray. Means we are at the max values
 		} else {
-			g.camera.spring.force = sf.force
+			g.camera.asym_obj.depletion = sf.depletion
 		}
 	}
 
@@ -1408,8 +1442,8 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 	}
 
 	//update the spring physics and update the camera position
-	update_weird_spring(&g.camera.spring, dt)
-	update_weird_spring(&g.camera.lookahead_spring, dt)
+	update_asympatic_averaging(&g.camera.asym_obj, dt)
+	update_asympatic_averaging(&g.camera.lookahead_asym_obj, dt)
 
 	last_pos = current_pos
 
@@ -1426,7 +1460,7 @@ update_camera :: proc(dt: f32){
 
 	camera_follow_cursor(dt)
 
-	update_camera_position(g.camera.spring.position + g.camera.lookahead_spring.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
+	update_camera_position(g.camera.asym_obj.position + g.camera.lookahead_asym_obj.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
 }
 
 //function for moving around camera in 3D
