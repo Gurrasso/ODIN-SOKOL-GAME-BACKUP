@@ -566,7 +566,7 @@ update_spring :: proc(spring: ^Spring, dt: f32){
 	
 }
 
-//spring physics
+//uses springs to do something similar to spring physics but without the springiness. It's more like something like Asympatic averaging.
 update_weird_spring :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
