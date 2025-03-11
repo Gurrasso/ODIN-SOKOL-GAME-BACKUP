@@ -481,12 +481,12 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 //buffer util
 
-get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, current_tex_index: u8) -> sg.Buffer{
+get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
 	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = current_tex_index  },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = current_tex_index  },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = current_tex_index  },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = current_tex_index  },
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index  },
+		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index  },
+		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index  },
+		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index  },
 	}
 	buffer := sg.make_buffer({ data = sg_range(vertices)})
 
@@ -621,11 +621,11 @@ WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", current_tex_index: u8 = 0, draw_priority: i32 = draw_layers.default){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos2: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, current_tex_index)
+	vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, tex_index)
 
 	append(&g.objects, Object{
 		{pos2.x, pos2.y, 0},
@@ -650,7 +650,7 @@ update_object :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", current_tex_index: u8 = 0, draw_priority: i32 = draw_layers.default){
+init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 
 	//color offset
@@ -659,7 +659,7 @@ init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
 
-	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, current_tex_index)
+	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
 
 
 	append(&g.objects, Object{
@@ -674,8 +674,9 @@ init_sprite :: proc(filename: cstring, pos2: Vec2 = {0,0}, size: Vec2 = {0.5, 0.
 
 //proc for updating sprites
 update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+
 	for &obj in g.objects{
-		if obj.id == id{
+		if obj.id == id{			
 			obj.pos = {pos2.x, pos2.y, 0}
 			obj.rot = {rot3.x, rot3.y, rot3.z}
 		}
@@ -685,13 +686,13 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 //  DRAW_LAYERS
 
 //a struct that defines layers with different draw priority
-Layers :: struct{
+Draw_layers :: struct{
 	default: i32,
 	text: i32,
 	cursor: i32,
 }
 
-draw_layers := Layers{
+draw_layers := Draw_layers{
 	//default layer
 	default = 1,
 	//text layer
@@ -700,7 +701,17 @@ draw_layers := Layers{
 	cursor = 10,
 }
 
+// TEX_INDICES
 
+Tex_indices :: struct{
+	default: u8,
+	text: u8,
+}
+
+tex_indices := Tex_indices{
+	default = 0,
+	text = 1,
+}
 
 //
 // FONT       (   a bit scuffed rn, gonna fix later(probably not)   )
@@ -884,10 +895,10 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 }
 
 //generate the Char_object
-generate_char_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, current_tex_index: u8 = 1) -> Char_object{
+generate_char_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, tex_index: u8 = tex_indices.text) -> Char_object{
 
 	// vertices
-	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, current_tex_index)
+	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, tex_index)
 
 	char_obj := Char_object{
 		{pos2.x, pos2.y, 0},
@@ -1051,6 +1062,8 @@ Player :: struct{
 	look_dir: Vec2,
 	default_move_speed: f32,
 	move_speed: f32,
+	dash: Dash_data,
+	sprint: Sprint_data,
 }
 
 init_player :: proc(){
@@ -1109,29 +1122,29 @@ update_player :: proc(dt: f32) {
 // PLAYER ABILITIES
 
 init_player_abilities :: proc(){
-	init_dash()
-	init_sprint()
+	init_player_dash()
+	init_player_sprint()
 }
 
 update_player_abilities :: proc(dt: f32){
 
 	//check for dash
-	if listen_key_single_down(dash.button){
-		dash.enabled = true
+	if listen_key_single_down(g.player.dash.button){
+		g.player.dash.enabled = true
 	}
-	if dash.enabled == true{
-		player_dash(dt)
+	if g.player.dash.enabled == true{
+		update_player_dash(&g.player.dash, dt)
 	}
 
 
 	//check for sprint
-	if listen_key_down(sprint.button) do sprint.enabled = true
-	else do sprint.enabled = false
+	if listen_key_down(g.player.sprint.button) do g.player.sprint.enabled = true
+	else do g.player.sprint.enabled = false
 	update_sprint()
 
 }
 
-//DASH ABILIY
+//DASH ABILITY
 
 Dash_data :: struct{
 	enabled: bool,
@@ -1144,10 +1157,10 @@ Dash_data :: struct{
 	cutoff: f32,
 }
 
-dash: Dash_data
 
-init_dash :: proc(){
-	dash = {
+
+init_player_dash :: proc(){
+	g.player.dash = Dash_data{
 		enabled = false,
 		//distance that is going to be traveled by the player
 		default_distance = 1.4,
@@ -1172,7 +1185,7 @@ dash_ease :: proc(x: f32) -> f32 {
 	return ease
 }
 
-player_dash :: proc(dt: f32){
+update_player_dash :: proc(dash: ^Dash_data, dt: f32){
 	dash.duration +=dash.duration_speed * dt
 	dash.distance = dash_ease(dash.duration)
 
@@ -1185,7 +1198,7 @@ player_dash :: proc(dt: f32){
 	dash.last_distance = dash.distance
 	
 	if dash.distance >= dash.cutoff{
-		init_dash()
+		
 		g.player.move_speed = g.player.default_move_speed
 	}
 }
@@ -1200,10 +1213,8 @@ Sprint_data :: struct{
 	speed: f32,
 }
 
-sprint: Sprint_data
-
-init_sprint :: proc(){
-	sprint = {
+init_player_sprint :: proc(){
+	g.player.sprint = {
 		enabled = false,
 		button = .LEFT_SHIFT,
 		speed = 7.5,
@@ -1211,7 +1222,7 @@ init_sprint :: proc(){
 }
 
 update_sprint :: proc(){
-	if sprint.enabled == true do g.player.move_speed = sprint.speed
+	if g.player.sprint.enabled == true do g.player.move_speed = g.player.sprint.speed
 	else do g.player.move_speed = g.player.default_move_speed
 }
 
