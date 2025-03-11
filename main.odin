@@ -72,6 +72,12 @@ Draw_data :: struct{
 	priority: i32,
 }
 
+Asympatic_object :: struct{
+	depletion: f32,
+	position: Vec2,
+	destination: Vec2,
+}
+
 // the vertex data
 Vertex_Data :: struct{
 	pos: Vec3,
@@ -579,6 +585,15 @@ update_weird_spring :: proc(spring: ^Spring, dt: f32){
 	spring.position += spring.velocity
 }
 
+//asympatic averaging
+update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
+	force := asym_obj.position - asym_obj.destination
+	x := get_vector_magnitude(force)
+	force = linalg.normalize0(force)
+	force *= -((x*asym_obj.depletion) * dt)
+	asym_obj.position += force
+}
+
 //
 // DRAWING
 //
@@ -683,7 +698,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, priority: i32 = 1) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, priority: i32 = 2) {
 	using stbtt
 
 	rotation : Vec3 = {0, 0, text_rot}
