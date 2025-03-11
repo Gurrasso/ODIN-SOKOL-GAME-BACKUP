@@ -18,6 +18,7 @@ package main
 	lighting(normalmaps),
 	
 		-camera shake,
+	replace wierd springs with asympatic averaging
 	
 	player movement acceleration and deceleration,
 	collisions,
