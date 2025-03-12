@@ -17,6 +17,8 @@ package main
 	tilemap and other environment/map things,
 	lighting(normalmaps),
 	antialiasing,
+	resolution scaling,
+	fix the icon,
 	
 		-camera shake,
 		-replace wierd springs with asympatic averaging,
@@ -139,16 +141,15 @@ main :: proc(){
 	context.logger = log.create_console_logger()
 	default_context = context
 
-
 	//sokol app
 	sapp.run({
-		width = 1000,
+		width  = 1000,
 		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
-		icon = { sokol_default = true },
+		icon = { sokol_default = false },
 
 		init_cb = init_cb,
 		frame_cb = frame_cb,
@@ -230,6 +231,8 @@ init_cb :: proc "c" (){
 
 	//create the sampler
 	g.sampler = sg.make_sampler({})
+
+	init_icon()
 }
 
 
@@ -387,6 +390,26 @@ load_image :: proc(filename: cstring) -> sg.Image{
 	stbi.image_free(pixels)
 
 	return image
+}
+
+get_image_desc :: proc(filename: cstring) -> sapp.Image_Desc{
+	w, h: i32
+	pixels := stbi.load(filename, &w, &h, nil, 4)
+	assert(pixels != nil)
+
+	pixel_range := sapp.Range{
+		ptr = pixels, 
+		size = uint(w * h * 4)
+	}
+	image_desc := sapp.Image_Desc{
+		width = w,
+		height = h,
+		pixels = pixel_range,
+	}
+
+	stbi.image_free(pixels)
+
+	return image_desc
 }
 
 //var for mouse movement
@@ -611,6 +634,16 @@ update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
 	force = linalg.normalize0(force)
 	force *= -((x*asym_obj.depletion) * dt)
 	asym_obj.position += force
+}
+
+//init the icon
+init_icon :: proc(){
+	// ICON
+	icon_desc := sapp.Icon_Desc{
+		sokol_default = false,
+		images = {0 = get_image_desc("./source/assets/textures/Random.png")}
+	}
+	sapp.set_icon(icon_desc)
 }
 
 //
@@ -994,7 +1027,6 @@ update_game_state :: proc(dt: f32){
 	update_player(dt)
 
 	update_camera(dt)
-
 
 	test_text_rot += test_text_rot_speed * dt
 	update_text(test_text_rot, "test_text")
