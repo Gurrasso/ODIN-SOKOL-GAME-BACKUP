@@ -10,6 +10,7 @@ package main
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 
+	add updating size of objects,
 
 	sprite sheet rendering, 
 	animation system thing?, 
