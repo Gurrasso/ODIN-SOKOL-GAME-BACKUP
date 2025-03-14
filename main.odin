@@ -620,20 +620,23 @@ update_asympatic_spring :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
 	x := get_vector_magnitude(force) - spring.restlength
-	force = linalg.normalize0(force)
-	force *= -1 * spring.force * x
-	force *= dt
-	spring.velocity = force
+  force = linalg.normalize0(force)
+  force *= -1 * spring.force * x
+  force *= dt
+  spring.velocity = force
 	spring.position += spring.velocity
 }
 
 //asympatic averaging
 update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
-	force := asym_obj.position - asym_obj.destination
-	x := get_vector_magnitude(force)
+  force := asym_obj.position - asym_obj.destination
+	log.debug(force)
+  x := get_vector_magnitude(force)
 	force = linalg.normalize0(force)
-	force *= -((x*asym_obj.depletion) * dt)
-	asym_obj.position += force
+  force *= -1 * x
+	force *= dt
+  force *= asym_obj.depletion
+  asym_obj.position += force
 }
 
 //init the icon
@@ -1232,6 +1235,10 @@ update_player_dash :: proc(dash: ^Dash_data, dt: f32){
 	if dash.distance >= dash.cutoff{
 		
 		g.player.move_speed = g.player.default_move_speed
+    g.player.dash.distance = 0
+    g.player.dash.last_distance = 0
+    g.player.dash.duration = 0
+    g.player.dash.enabled = false
 	}
 }
 
@@ -1486,7 +1493,7 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 
 	//update the spring physics and update the camera position
 	update_asympatic_averaging(&g.camera.asym_obj, dt)
-	update_asympatic_averaging(&g.camera.lookahead_asym_obj, dt)
+  update_asympatic_averaging(&g.camera.lookahead_asym_obj, dt)
 
 	last_pos = current_pos
 
