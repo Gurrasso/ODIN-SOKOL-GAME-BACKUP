@@ -46,6 +46,7 @@ import "core:math/ease"
 import "core:mem"
 import "core:os"
 import "core:sort"
+import "core:fmt"
 // stb
 import stbi "vendor:stb/image"
 import stbtt "vendor:stb/truetype"
@@ -630,7 +631,6 @@ update_asympatic_spring :: proc(spring: ^Spring, dt: f32){
 //asympatic averaging
 update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
   force := asym_obj.position - asym_obj.destination
-	log.debug(force)
   x := get_vector_magnitude(force)
 	force = linalg.normalize0(force)
   force *= -1 * x
@@ -644,7 +644,7 @@ init_icon :: proc(){
 	// ICON
 	icon_desc := sapp.Icon_Desc{
 		sokol_default = false,
-		images = {0 = get_image_desc("./source/assets/textures/Random.png")}
+		images = {0 = get_image_desc("./source/assets/sprites/ase256.png")}
 	}
 	sapp.set_icon(icon_desc)
 }
