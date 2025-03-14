@@ -19,7 +19,7 @@ package main
 	lighting(normalmaps),
 	antialiasing,
 	resolution scaling,
-	fix the icon,
+	fix init_icon,
 	
 		-camera shake,
 		-replace wierd springs with asympatic averaging,
@@ -147,16 +147,18 @@ main :: proc(){
 		width  = 1000,
 		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
+    icon = { sokol_default = true },
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
-		icon = { sokol_default = false },
 
 		init_cb = init_cb,
 		frame_cb = frame_cb,
 		cleanup_cb = cleanup_cb,
 		event_cb = event_cb,
 	})
+
+  
 }
 
 //
@@ -232,8 +234,6 @@ init_cb :: proc "c" (){
 
 	//create the sampler
 	g.sampler = sg.make_sampler({})
-
-	init_icon()
 }
 
 
@@ -261,6 +261,7 @@ cleanup_cb :: proc "c" (){
 
 	//free the global vars
 	free(g)
+  free_all()
 
 
 	//shut down sokol graphics
@@ -640,11 +641,10 @@ update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
 }
 
 //init the icon
-init_icon :: proc(){
+init_icon :: proc(imagefile: cstring){
 	// ICON
-	icon_desc := sapp.Icon_Desc{
-		sokol_default = false,
-		images = {0 = get_image_desc("./source/assets/sprites/ase256.png")}
+  icon_desc := sapp.Icon_Desc{
+	  images = {0 = get_image_desc(imagefile)}
 	}
 	sapp.set_icon(icon_desc)
 }
@@ -1162,6 +1162,10 @@ init_player_abilities :: proc(){
 }
 
 update_player_abilities :: proc(dt: f32){
+  //check for sprint
+	if listen_key_down(g.player.sprint.button) do g.player.sprint.enabled = true
+	else do g.player.sprint.enabled = false
+	update_sprint()
 
 	//check for dash
 	if listen_key_single_down(g.player.dash.button){
@@ -1170,13 +1174,6 @@ update_player_abilities :: proc(dt: f32){
 	if g.player.dash.enabled == true{
 		update_player_dash(&g.player.dash, dt)
 	}
-
-
-	//check for sprint
-	if listen_key_down(g.player.sprint.button) do g.player.sprint.enabled = true
-	else do g.player.sprint.enabled = false
-	update_sprint()
-
 }
 
 //DASH ABILITY
@@ -1198,7 +1195,7 @@ init_player_dash :: proc(){
 	g.player.dash = Dash_data{
 		enabled = false,
 		//distance that is going to be traveled by the player
-		default_distance = 1.4,
+		default_distance = 2,
 		//dash button
 		button = .SPACE,
 		//How fast it travels
