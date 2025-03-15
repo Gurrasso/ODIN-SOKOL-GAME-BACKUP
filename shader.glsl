@@ -53,7 +53,6 @@ void main() {
         // this is text, it's only got the single .r channel so we stuff it into the alpha
         tex_col.a = texture(sampler2D(tex, smp), texcoord).r;
     }
-    
 
     frag_color = tex_col;
     frag_color *= color;
