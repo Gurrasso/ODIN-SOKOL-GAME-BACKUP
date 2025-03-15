@@ -1089,33 +1089,61 @@ check_collision :: proc (){
 
 Player :: struct{
 	id: cstring,
-	sprite: cstring,
+	sprite_filename: cstring,
 	pos: Vec2,
 	size: Vec2,
 	rot: f32,
-	move_dir: Vec2,
+	
+  move_dir: Vec2,
 	look_dir: Vec2,
-	default_move_speed: f32,
+	
+  default_move_speed: f32,
 	move_speed: f32,
-	dash: Dash_data,
+  current_move_speed: f32,
+	
+  dash: Dash_data,
 	sprint: Sprint_data,
+
+  acceleration: f32,
+  deceleration: f32,
+  duration: f32,
+  cutoff: f32,
+
 }
 
 init_player :: proc(){
 	// setup the player
 	g.player = Player{
 		id = "Player",
-		sprite = "./source/assets/textures/Random.png",
-		pos = {0, 0},
+		sprite_filename = "./source/assets/textures/Random.png",
+		
+    pos = {0, 0},
 		size ={1, 1},
 		rot = 0,
-		move_dir = {1, 0},
+		
+    move_dir = {1, 0},
 		default_move_speed = 5,
-	}
+	  
+    acceleration = 16.2,
+    deceleration = 18,
+    cutoff = 0.92,
+  }
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
-	init_sprite(g.player.sprite, g.player.pos, g.player.size, g.player.id)
+	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
+}
+
+player_acceleration_ease :: proc(x: f32) -> f32 {
+	ease := 1 - math.pow(1 - x, 3);
+
+	return ease
+}
+
+player_deceleration_ease :: proc(x: f32) -> f32 {
+  ease := x
+
+  return ease
 }
 
 update_player :: proc(dt: f32) {
@@ -1132,18 +1160,31 @@ update_player :: proc(dt: f32) {
 
 	motion : Vec2
 
-	if move_input != 0 {
-		g.player.move_dir = up * move_input.y + right * move_input.x
 	
-		motion = linalg.normalize0(g.player.move_dir) * g.player.move_speed * dt
-	}
-
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	g.player.look_dir = g.player.move_dir
 
 	update_player_abilities(dt)
 
-	//creates a player rotation based of the movement
+	if move_input != 0 {
+		g.player.move_dir = up * move_input.y + right * move_input.x
+	  
+    g.player.duration = math.clamp(g.player.duration, 0, g.player.cutoff)
+    g.player.duration += g.player.acceleration * dt
+	  g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
+  } else {
+    
+    g.player.duration -= g.player.deceleration * dt
+    g.player.duration = math.clamp(g.player.duration, 0, g.player.cutoff) 
+    g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
+  }
+
+
+  
+  motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
+
+
+  //creates a player rotation based of the movement
 	g.player.rot = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
 
 	
