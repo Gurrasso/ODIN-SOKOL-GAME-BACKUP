@@ -1107,8 +1107,6 @@ Player :: struct{
   acceleration: f32,
   deceleration: f32,
   duration: f32,
-  cutoff: f32,
-
 }
 
 init_player :: proc(){
@@ -1122,11 +1120,10 @@ init_player :: proc(){
 		rot = 0,
 		
     move_dir = {1, 0},
-		default_move_speed = 5,
+		default_move_speed = 4,
 	  
     acceleration = 16.2,
     deceleration = 18,
-    cutoff = 0.92,
   }
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
@@ -1161,21 +1158,28 @@ update_player :: proc(dt: f32) {
 	motion : Vec2
 
 	
-	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
-	g.player.look_dir = g.player.move_dir
+	g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	//g.player.look_dir = g.player.move_dir
 
 	update_player_abilities(dt)
-
+  
+  //player movement with easing curves
 	if move_input != 0 {
 		g.player.move_dir = up * move_input.y + right * move_input.x
 	  
-    g.player.duration = math.clamp(g.player.duration, 0, g.player.cutoff)
+    //increase duration with the acceleration
     g.player.duration += g.player.acceleration * dt
-	  g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
+    //clamp the duration between 0 and 1
+	  g.player.duration = math.clamp(g.player.duration, 0, 1)
+    //the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
+    g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
   } else {
     
+    //the duration decreses with the deceleration when not giving any input
     g.player.duration -= g.player.deceleration * dt
-    g.player.duration = math.clamp(g.player.duration, 0, g.player.cutoff) 
+    //the duration is still clamped between 0 and 1
+    g.player.duration = math.clamp(g.player.duration, 0, 1)
+    //the speed is set to the desired speed times the deceleration easing of the duration
     g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
   }
 
@@ -1236,7 +1240,7 @@ init_player_dash :: proc(){
 	g.player.dash = Dash_data{
 		enabled = false,
 		//distance that is going to be traveled by the player
-		default_distance = 2,
+		default_distance = 1.6,
 		//dash button
 		button = .SPACE,
 		//How fast it travels
@@ -1294,7 +1298,7 @@ init_player_sprint :: proc(){
 	g.player.sprint = {
 		enabled = false,
 		button = .LEFT_SHIFT,
-		speed = 7.5,
+		speed = 5.5,
 	}
 }
 
@@ -1318,7 +1322,7 @@ Cursor :: struct{
 init_cursor :: proc(){
 	g.cursor = Cursor{
 		//cursor position
-		pos = { 0,0 },
+		pos = { 1,0 },
 		//cursor rotation
 		rot = 0,
 		//sensitivity
