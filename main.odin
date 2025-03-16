@@ -1093,6 +1093,7 @@ Player :: struct{
 	pos: Vec2,
 	size: Vec2,
 	rot: f32,
+  xflip_rot: f32,
 	
   move_dir: Vec2,
 	look_dir: Vec2,
@@ -1118,6 +1119,8 @@ init_player :: proc(){
     pos = {0, 0},
 		size ={1, 1},
 		rot = 0,
+    //used for flipping the player sprite in the x dir, kinda temporary(should replace later)
+    xflip_rot = 0,
 		
     move_dir = {1, 0},
 		default_move_speed = 4,
@@ -1156,9 +1159,13 @@ update_player :: proc(dt: f32) {
 	right := Vec2{1,0}
 
 	motion : Vec2
-
-	
-	g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+  
+  if g.cursor.pos.x+g.camera.position.x <= g.player.pos.x{
+    g.player.xflip_rot = 180
+  } else {
+    g.player.xflip_rot = 0
+  }
+	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
 	update_player_abilities(dt)
@@ -1195,7 +1202,7 @@ update_player :: proc(dt: f32) {
 
 
 	g.player.pos += motion
-	update_sprite(g.player.pos, {0, 0, g.player.rot}, g.player.id)
+	update_sprite(g.player.pos, {0, g.player.xflip_rot, g.player.rot}, g.player.id)
 }
 
 
