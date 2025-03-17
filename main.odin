@@ -67,6 +67,7 @@ Mat4 :: matrix[4, 4]f32
 Vec2 :: [2]f32
 Vec3 :: [3]f32
 Vec4 :: [4]f32
+Id :: i32
 
 //draw call data
 Draw_data :: struct{
@@ -130,6 +131,7 @@ Globals :: struct {
 	text_objects: [dynamic]Text_object,
 	cursor: Cursor,
 	runtime: f32,
+  items: Items,
 }
 g: ^Globals
 
@@ -997,6 +999,57 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 }
 
 
+// ITEMS
+
+Item :: map[string]any
+Items :: map[string]Item
+
+Item_data :: struct{
+  sprite_filename: cstring,
+}
+
+init_items :: proc(){
+  init_weapons()
+}
+
+// WEAPONS
+
+
+init_weapons :: proc(){
+
+  // GUUN
+  gun_weapon_data := Projectile_weapon{
+    projectile_filename = WHITE_IMAGE_PATH,
+    primary_trigger = .X,
+    damage = 10,
+    spread = 0,
+    speed = 20,
+  }
+  gun_item_data := Item_data{
+    sprite_filename = WHITE_IMAGE_PATH,
+  }
+  g.items["gun"] = Item{"item" = gun_item_data, "weapon" = gun_weapon_data, "init" = init_projectile_weapon, "update" = update_projectile_weapon}
+}
+
+//projectile weapon
+Projectile_weapon :: struct{
+  sprite_filename: cstring,
+  projectile_filename: cstring,
+  primary_trigger: sapp.Keycode,
+  damage: f32,
+  spread: f32,
+  speed: f32,
+}
+
+init_projectile_weapon :: proc(){
+
+}
+
+update_projectile_weapon :: proc(dt: f32){
+  //Does the projectile weapon things
+}
+
+
 //
 // GAME
 //
@@ -1009,6 +1062,8 @@ init_game_state :: proc(){
 
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
+
+  init_items()
 
 
 	init_player()
@@ -1108,6 +1163,8 @@ Player :: struct{
   acceleration: f32,
   deceleration: f32,
   duration: f32,
+
+  holder: Holder,
 }
 
 init_player :: proc(){
@@ -1127,11 +1184,34 @@ init_player :: proc(){
 	  
     acceleration = 16.2,
     deceleration = 18,
+
+    holder = {
+      pos = {0, 0},
+      rot = {0, 0, 0},
+      size = {0.7, 0.3},
+      item = g.items["gun"],
+      sprite_id = "playerholder"
+    }
   }
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
+
 	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
+  init_holder(&g.player.holder)
+}
+
+Holder :: struct{
+  pos: Vec2,
+  rot: Vec3,
+  size: Vec2,
+  item: Item,
+  sprite_id: cstring,
+}
+
+init_holder :: proc(holder: ^Holder){
+  //init_sprite(filename = holder.item["item"].filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
+
 }
 
 player_acceleration_ease :: proc(x: f32) -> f32 {
@@ -1190,6 +1270,12 @@ update_player :: proc(dt: f32) {
     g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
   }
 
+  
+  //the players item holder
+  holder := g.player.holder
+  item := g.player.holder.item
+
+  
 
   
   motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
@@ -1197,9 +1283,6 @@ update_player :: proc(dt: f32) {
 
   //creates a player rotation based of the movement
 	g.player.rot = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
-
-	
-
 
 	g.player.pos += motion
 	update_sprite(g.player.pos, {0, g.player.xflip_rot, g.player.rot}, g.player.id)
@@ -1632,3 +1715,4 @@ update_camera_shake :: proc(dt: f32){
 		cs.trauma -= cs.depletion * dt
 	}
 }
+
