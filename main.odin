@@ -1033,7 +1033,6 @@ init_weapons :: proc(){
 
 //projectile weapon
 Projectile_weapon :: struct{
-	sprite_filename: cstring,
 	projectile_filename: cstring,
 	primary_trigger: sapp.Keycode,
 	damage: f32,
@@ -1047,6 +1046,7 @@ init_projectile_weapon :: proc(){
 
 update_projectile_weapon :: proc(dt: f32){
 	//Does the projectile weapon things
+	log.debug("weapon update")
 }
 
 
