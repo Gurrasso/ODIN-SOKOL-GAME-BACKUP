@@ -34,7 +34,7 @@ package main
 
 
 // 
-//  IMPORTS
+//	IMPORTS
 //
 import "base:intrinsics"
 import "base:runtime"
@@ -131,7 +131,7 @@ Globals :: struct {
 	text_objects: [dynamic]Text_object,
 	cursor: Cursor,
 	runtime: f32,
-  items: Items,
+	items: Items,
 }
 g: ^Globals
 
@@ -146,10 +146,10 @@ main :: proc(){
 
 	//sokol app
 	sapp.run({
-		width  = 1000,
+		width	= 1000,
 		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
-    icon = { sokol_default = true },
+		icon = { sokol_default = true },
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
@@ -160,7 +160,7 @@ main :: proc(){
 		event_cb = event_cb,
 	})
 
-  
+	
 }
 
 //
@@ -263,7 +263,7 @@ cleanup_cb :: proc "c" (){
 
 	//free the global vars
 	free(g)
-  free_all()
+	free_all()
 
 
 	//shut down sokol graphics
@@ -285,7 +285,7 @@ frame_cb :: proc "c" (){
 
 	update_game_state(dt)
 
-	//  projection matrix(turns normal coords to screen coords)
+	//	projection matrix(turns normal coords to screen coords)
 	p := linalg.matrix4_perspective_f32(70, sapp.widthf() / sapp.heightf(), 0.0001, 1000)
 	//view matrix
 	v := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {0, 1, 0})
@@ -370,7 +370,7 @@ frame_cb :: proc "c" (){
 //
 
 
-//  proc for loading an image from a file
+//	proc for loading an image from a file
 load_image :: proc(filename: cstring) -> sg.Image{
 	w, h: i32
 	pixels := stbi.load(filename, &w, &h, nil, 4)
@@ -510,10 +510,10 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
 	vertices := []Vertex_Data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index  },
-		{ pos = {  (size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index  },
-		{ pos = { -(size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index  },
-		{ pos = {  (size.x/2),  (size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index  },
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index	},
+		{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index	},
+		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index	},
+		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index	},
 	}
 	buffer := sg.make_buffer({ data = sg_range(vertices)})
 
@@ -571,7 +571,7 @@ xform_scale :: proc(scale: Vec2) -> Matrix4 {
 
 //removing objects
 
-remove_object ::  proc(id: cstring){
+remove_object ::	proc(id: cstring){
 	for i := 0; i < len(g.objects); i += 1 {
 		if g.objects[i].id == id{
 			ordered_remove(&g.objects, i)
@@ -602,7 +602,7 @@ vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 //math util
 
 get_vector_magnitude :: proc(vec: Vec2) -> f32{
-	magv := math.sqrt(vec.x * vec.x  + vec.y * vec.y)
+	magv := math.sqrt(vec.x * vec.x	+ vec.y * vec.y)
 	return magv
 }
 
@@ -624,29 +624,29 @@ update_asympatic_spring :: proc(spring: ^Spring, dt: f32){
 
 	force := spring.position - spring.anchor
 	x := get_vector_magnitude(force) - spring.restlength
-  force = linalg.normalize0(force)
-  force *= -1 * spring.force * x
-  force *= dt
-  spring.velocity = force
+	force = linalg.normalize0(force)
+	force *= -1 * spring.force * x
+	force *= dt
+	spring.velocity = force
 	spring.position += spring.velocity
 }
 
 //asympatic averaging
 update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object, dt: f32){
-  force := asym_obj.position - asym_obj.destination
-  x := get_vector_magnitude(force)
+	force := asym_obj.position - asym_obj.destination
+	x := get_vector_magnitude(force)
 	force = linalg.normalize0(force)
-  force *= -1 * x
+	force *= -1 * x
 	force *= dt
-  force *= asym_obj.depletion
-  asym_obj.position += force
+	force *= asym_obj.depletion
+	asym_obj.position += force
 }
 
 //init the icon
 init_icon :: proc(imagefile: cstring){
 	// ICON
-  icon_desc := sapp.Icon_Desc{
-	  images = {0 = get_image_desc(imagefile)}
+	icon_desc := sapp.Icon_Desc{
+		images = {0 = get_image_desc(imagefile)}
 	}
 	sapp.set_icon(icon_desc)
 }
@@ -721,7 +721,7 @@ update_sprite :: proc(pos2: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 	}
 }
 
-//  DRAW_LAYERS
+//	DRAW_LAYERS
 
 //a struct that defines layers with different draw priority
 Draw_layers :: struct{
@@ -752,7 +752,7 @@ tex_indices := Tex_indices{
 }
 
 //
-// FONT       (   a bit scuffed rn, gonna fix later(probably not)   )
+// FONT			 (	 a bit scuffed rn, gonna fix later(probably not)	 )
 //
 
 Char_object :: struct{
@@ -839,7 +839,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		
 		append(&text_objects, char_obj)
 
-		x +=  advance_x
+		x +=	advance_x
 		y += -advance_y
 	}
 
@@ -1005,11 +1005,11 @@ Item :: map[string]any
 Items :: map[string]Item
 
 Item_data :: struct{
-  sprite_filename: cstring,
+	sprite_filename: cstring,
 }
 
 init_items :: proc(){
-  init_weapons()
+	init_weapons()
 }
 
 // WEAPONS
@@ -1017,28 +1017,28 @@ init_items :: proc(){
 
 init_weapons :: proc(){
 
-  // GUUN
-  gun_weapon_data := Projectile_weapon{
-    projectile_filename = WHITE_IMAGE_PATH,
-    primary_trigger = .X,
-    damage = 10,
-    spread = 0,
-    speed = 20,
-  }
-  gun_item_data := Item_data{
-    sprite_filename = WHITE_IMAGE_PATH,
-  }
-  g.items["gun"] = Item{"item" = gun_item_data, "weapon" = gun_weapon_data, "init" = init_projectile_weapon, "update" = update_projectile_weapon}
+	// GUUN
+	gun_weapon_data := Projectile_weapon{
+		projectile_filename = WHITE_IMAGE_PATH,
+		primary_trigger = .X,
+		damage = 10,
+		spread = 0,
+		speed = 20,
+	}
+	gun_item_data := Item_data{
+		sprite_filename = WHITE_IMAGE_PATH,
+	}
+	g.items["gun"] = Item{"item" = gun_item_data, "weapon" = gun_weapon_data, "init" = init_projectile_weapon, "update" = update_projectile_weapon}
 }
 
 //projectile weapon
 Projectile_weapon :: struct{
-  sprite_filename: cstring,
-  projectile_filename: cstring,
-  primary_trigger: sapp.Keycode,
-  damage: f32,
-  spread: f32,
-  speed: f32,
+	sprite_filename: cstring,
+	projectile_filename: cstring,
+	primary_trigger: sapp.Keycode,
+	damage: f32,
+	spread: f32,
+	speed: f32,
 }
 
 init_projectile_weapon :: proc(){
@@ -1046,7 +1046,7 @@ init_projectile_weapon :: proc(){
 }
 
 update_projectile_weapon :: proc(dt: f32){
-  //Does the projectile weapon things
+	//Does the projectile weapon things
 }
 
 
@@ -1063,7 +1063,7 @@ init_game_state :: proc(){
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
 
-  init_items()
+	init_items()
 
 
 	init_player()
@@ -1148,23 +1148,23 @@ Player :: struct{
 	pos: Vec2,
 	size: Vec2,
 	rot: f32,
-  xflip_rot: f32,
+	xflip_rot: f32,
 	
-  move_dir: Vec2,
+	move_dir: Vec2,
 	look_dir: Vec2,
 	
-  default_move_speed: f32,
+	default_move_speed: f32,
 	move_speed: f32,
-  current_move_speed: f32,
+	current_move_speed: f32,
 	
-  dash: Dash_data,
+	dash: Dash_data,
 	sprint: Sprint_data,
 
-  acceleration: f32,
-  deceleration: f32,
-  duration: f32,
+	acceleration: f32,
+	deceleration: f32,
+	duration: f32,
 
-  holder: Holder,
+	holder: Holder,
 }
 
 init_player :: proc(){
@@ -1173,44 +1173,44 @@ init_player :: proc(){
 		id = "Player",
 		sprite_filename = "./source/assets/textures/Random.png",
 		
-    pos = {0, 0},
+		pos = {0, 0},
 		size ={1, 1},
 		rot = 0,
-    //used for flipping the player sprite in the x dir, kinda temporary(should replace later)
-    xflip_rot = 0,
+		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
+		xflip_rot = 0,
 		
-    move_dir = {1, 0},
+		move_dir = {1, 0},
 		default_move_speed = 4,
-	  
-    acceleration = 16.2,
-    deceleration = 18,
+		
+		acceleration = 16.2,
+		deceleration = 18,
 
-    holder = {
-      pos = {0, 0},
-      rot = {0, 0, 0},
-      size = {0.7, 0.3},
-      item = g.items["gun"],
-      sprite_id = "playerholder"
-    }
-  }
+		holder = {
+			pos = {0, 0},
+			rot = {0, 0, 0},
+			size = {0.7, 0.3},
+			item = g.items["gun"],
+			sprite_id = "playerholder"
+		}
+	}
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
 
 	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
-  init_holder(&g.player.holder)
+	init_holder(&g.player.holder)
 }
 
 Holder :: struct{
-  pos: Vec2,
-  rot: Vec3,
-  size: Vec2,
-  item: Item,
-  sprite_id: cstring,
+	pos: Vec2,
+	rot: Vec3,
+	size: Vec2,
+	item: Item,
+	sprite_id: cstring,
 }
 
 init_holder :: proc(holder: ^Holder){
-  //init_sprite(filename = holder.item["item"].filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
+	//init_sprite(filename = holder.item["item"].filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
 
 }
 
@@ -1221,9 +1221,9 @@ player_acceleration_ease :: proc(x: f32) -> f32 {
 }
 
 player_deceleration_ease :: proc(x: f32) -> f32 {
-  ease := x
+	ease := x
 
-  return ease
+	return ease
 }
 
 update_player :: proc(dt: f32) {
@@ -1239,49 +1239,49 @@ update_player :: proc(dt: f32) {
 	right := Vec2{1,0}
 
 	motion : Vec2
-  
-  if g.cursor.pos.x+g.camera.position.x <= g.player.pos.x{
-    g.player.xflip_rot = 180
-  } else {
-    g.player.xflip_rot = 0
-  }
+	
+	if g.cursor.pos.x+g.camera.position.x <= g.player.pos.x{
+		g.player.xflip_rot = 180
+	} else {
+		g.player.xflip_rot = 0
+	}
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
 	update_player_abilities(dt)
-  
-  //player movement with easing curves
+	
+	//player movement with easing curves
 	if move_input != 0 {
 		g.player.move_dir = up * move_input.y + right * move_input.x
-	  
-    //increase duration with the acceleration
-    g.player.duration += g.player.acceleration * dt
-    //clamp the duration between 0 and 1
-	  g.player.duration = math.clamp(g.player.duration, 0, 1)
-    //the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
-    g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
-  } else {
-    
-    //the duration decreses with the deceleration when not giving any input
-    g.player.duration -= g.player.deceleration * dt
-    //the duration is still clamped between 0 and 1
-    g.player.duration = math.clamp(g.player.duration, 0, 1)
-    //the speed is set to the desired speed times the deceleration easing of the duration
-    g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
-  }
+		
+		//increase duration with the acceleration
+		g.player.duration += g.player.acceleration * dt
+		//clamp the duration between 0 and 1
+		g.player.duration = math.clamp(g.player.duration, 0, 1)
+		//the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
+		g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
+	} else {
+		
+		//the duration decreses with the deceleration when not giving any input
+		g.player.duration -= g.player.deceleration * dt
+		//the duration is still clamped between 0 and 1
+		g.player.duration = math.clamp(g.player.duration, 0, 1)
+		//the speed is set to the desired speed times the deceleration easing of the duration
+		g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
+	}
 
-  
-  //the players item holder
-  holder := g.player.holder
-  item := g.player.holder.item
+	
+	//the players item holder
+	holder := g.player.holder
+	item := g.player.holder.item
 
-  
+	
 
-  
-  motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
+	
+	motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
 
 
-  //creates a player rotation based of the movement
+	//creates a player rotation based of the movement
 	g.player.rot = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
 
 	g.player.pos += motion
@@ -1297,7 +1297,7 @@ init_player_abilities :: proc(){
 }
 
 update_player_abilities :: proc(dt: f32){
-  //check for sprint
+	//check for sprint
 	if listen_key_down(g.player.sprint.button) do g.player.sprint.enabled = true
 	else do g.player.sprint.enabled = false
 	update_sprint()
@@ -1367,10 +1367,10 @@ update_player_dash :: proc(dash: ^Dash_data, dt: f32){
 	if dash.distance >= dash.cutoff{
 		
 		g.player.move_speed = g.player.default_move_speed
-    g.player.dash.distance = 0
-    g.player.dash.last_distance = 0
-    g.player.dash.duration = 0
-    g.player.dash.enabled = false
+		g.player.dash.distance = 0
+		g.player.dash.last_distance = 0
+		g.player.dash.duration = 0
+		g.player.dash.enabled = false
 	}
 }
 
@@ -1625,7 +1625,7 @@ camera_follow :: proc(dt: f32, position: Vec2, lookahead: f32 = 0, lookahead_dir
 
 	//update the spring physics and update the camera position
 	update_asympatic_averaging(&g.camera.asym_obj, dt)
-  update_asympatic_averaging(&g.camera.lookahead_asym_obj, dt)
+	update_asympatic_averaging(&g.camera.lookahead_asym_obj, dt)
 
 	last_pos = current_pos
 
