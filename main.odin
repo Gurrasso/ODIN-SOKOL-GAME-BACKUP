@@ -6,9 +6,10 @@ package main
 /*
 	TODO: 
 	
-	use hashmaps for things like the fonts?, 
+	use hashmaps for the fonts?, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
+	fix text \n not working
 
 	add updating size of objects,
 
@@ -29,7 +30,9 @@ package main
 	
 	custom cursor,
 		-make it so cursor cant go outside screen,
-	
+
+	use enteties for abilities
+
 */
 
 
@@ -118,20 +121,25 @@ Spring :: struct{
 
 //global vars
 Globals :: struct {
+	// Game state stuff
 	should_quit: bool,
+	runtime: f32,
+	//graphics stuff
 	shader: sg.Shader,
 	pipeline: sg.Pipeline,
-	index_buffer: sg.Buffer,
-	objects: [dynamic]Object,
+	index_buffer: sg.Buffer,	
 	sampler: sg.Sampler,
-	rotation: Vec3,
+	//Objects for drawing
+	text_objects: [dynamic]Text_object,
+	objects: [dynamic]Object,
+	//Things there are only one of
 	camera: Camera,
 	player: Player,
-	fonts: [dynamic]FONT_INFO,
-	text_objects: [dynamic]Text_object,
 	cursor: Cursor,
-	runtime: f32,
-	items: Items,
+
+
+	fonts: [dynamic]FONT_INFO,
+	items: Entities,
 }
 g: ^Globals
 
@@ -143,6 +151,7 @@ main :: proc(){
 	//logger
 	context.logger = log.create_console_logger()
 	default_context = context
+
 
 	//sokol app
 	sapp.run({
@@ -183,8 +192,7 @@ init_cb :: proc "c" (){
 
 	//the globals
 	g = new(Globals)
-
-	init_game_state()
+	g.items = make(Entities)
 
 	//make the shader and pipeline
 	g.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
@@ -236,6 +244,8 @@ init_cb :: proc "c" (){
 
 	//create the sampler
 	g.sampler = sg.make_sampler({})
+
+	init_game_state()
 }
 
 
@@ -999,12 +1009,13 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 }
 
 
+// ENTETIES
+EntityComponents :: map[string]any
+Entities :: map[string]EntityComponents
+
 // ITEMS
 
-Item :: map[string]any
-Items :: map[string]Item
-
-Item_data :: struct{
+item_data :: struct{
 	sprite_filename: cstring,
 }
 
@@ -1012,23 +1023,55 @@ init_items :: proc(){
 	init_weapons()
 }
 
+// ITEM HOLDER
+Item_holder :: struct{
+	pos: Vec2,
+	rot: Vec3,
+	size: Vec2,
+	item: EntityComponents,
+	sprite_id: cstring,
+}
+
+init_item_holder :: proc(holder: ^Item_holder){
+	assert(holder.item["item"] != nil)
+	item_data := holder.item["item"]
+	log.debug(item_data)
+	//init_sprite(filename = item_data.sprite_filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
+}
+
+update_item_holder :: proc(holder: ^Item_holder, pos: Vec2, rot: Vec3){
+	//the players item holder
+	item := holder.item
+}
+
 // WEAPONS
 
+gun_weapon_data: Projectile_weapon
+gun_item_data: item_data
+gun_item: EntityComponents
 
 init_weapons :: proc(){
 
 	// GUUN
-	gun_weapon_data := Projectile_weapon{
+	gun_weapon_data = Projectile_weapon{
 		projectile_filename = WHITE_IMAGE_PATH,
 		primary_trigger = .X,
 		damage = 10,
 		spread = 0,
 		speed = 20,
 	}
-	gun_item_data := Item_data{
+	gun_item_data = item_data{
 		sprite_filename = WHITE_IMAGE_PATH,
 	}
-	g.items["gun"] = Item{"item" = gun_item_data, "weapon" = gun_weapon_data, "init" = init_projectile_weapon, "update" = update_projectile_weapon}
+	gun_item = EntityComponents{
+		"item" = gun_item_data,
+		"weapon" = gun_weapon_data,
+		"init" = init_projectile_weapon, 
+		"update" = update_projectile_weapon,
+	}
+
+
+	g.items["gun"] = gun_item
 }
 
 //projectile weapon
@@ -1040,11 +1083,11 @@ Projectile_weapon :: struct{
 	speed: f32,
 }
 
-init_projectile_weapon :: proc(){
+init_projectile_weapon :: proc(weapon: Projectile_weapon){
 
 }
 
-update_projectile_weapon :: proc(dt: f32){
+update_projectile_weapon :: proc(weapon: Projectile_weapon, dt: f32){
 	//Does the projectile weapon things
 	log.debug("weapon update")
 }
@@ -1060,16 +1103,13 @@ test_text_rot_speed: f32 = 120
 
 init_game_state :: proc(){
 
+	init_items()
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
-
-	init_items()
-
 
 	init_player()
 
 	init_camera()
-
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
@@ -1081,6 +1121,7 @@ init_game_state :: proc(){
 update_game_state :: proc(dt: f32){
 
 	event_listener()
+
 	// move_camera_3D(dt)
 	update_player(dt)
 
@@ -1164,7 +1205,7 @@ Player :: struct{
 	deceleration: f32,
 	duration: f32,
 
-	holder: Holder,
+	holder: Item_holder,
 }
 
 init_player :: proc(){
@@ -1198,21 +1239,9 @@ init_player :: proc(){
 
 
 	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
-	init_holder(&g.player.holder)
+	init_item_holder(&g.player.holder)
 }
 
-Holder :: struct{
-	pos: Vec2,
-	rot: Vec3,
-	size: Vec2,
-	item: Item,
-	sprite_id: cstring,
-}
-
-init_holder :: proc(holder: ^Holder){
-	//init_sprite(filename = holder.item["item"].filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
-
-}
 
 player_acceleration_ease :: proc(x: f32) -> f32 {
 	ease := 1 - math.pow(1 - x, 3);
@@ -1268,14 +1297,7 @@ update_player :: proc(dt: f32) {
 		g.player.duration = math.clamp(g.player.duration, 0, 1)
 		//the speed is set to the desired speed times the deceleration easing of the duration
 		g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
-	}
-
-	
-	//the players item holder
-	holder := g.player.holder
-	item := g.player.holder.item
-
-	
+	}	
 
 	
 	motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
