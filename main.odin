@@ -59,7 +59,7 @@ import shelpers "../sokol/helpers"
 import sg "../sokol/gfx"
 import sglue "../sokol/glue"
 //ecs
-import ecs "odin-ecs"
+import ecs "./lib/odin-ecs"
 
 to_radians :: linalg.to_radians
 Matrix4 :: linalg.Matrix4f32;
