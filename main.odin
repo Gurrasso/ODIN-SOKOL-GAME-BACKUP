@@ -58,6 +58,8 @@ import sapp "../sokol/app"
 import shelpers "../sokol/helpers"
 import sg "../sokol/gfx"
 import sglue "../sokol/glue"
+//ecs
+import ecs "odin-ecs"
 
 to_radians :: linalg.to_radians
 Matrix4 :: linalg.Matrix4f32;
@@ -139,9 +141,11 @@ Globals :: struct {
 
 
 	fonts: [dynamic]FONT_INFO,
-	items: Entities,
+	enteties: Enteties,
 }
 g: ^Globals
+
+ctx: ecs.Context
 
 // 
 // MAIN!!!!!
@@ -179,6 +183,8 @@ main :: proc(){
 //initialization
 init_cb :: proc "c" (){
 	context = default_context
+	ctx = ecs.init_ecs()
+	defer ecs.deinit_ecs(&ctx)
 
 	//setup for the sokol graphics
 	sg.setup({
@@ -192,7 +198,6 @@ init_cb :: proc "c" (){
 
 	//the globals
 	g = new(Globals)
-	g.items = make(Entities)
 
 	//make the shader and pipeline
 	g.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
@@ -1010,68 +1015,46 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 
 
 // ENTETIES
-EntityComponents :: map[string]any
-Entities :: map[string]EntityComponents
-
-// ITEMS
-
-item_data :: struct{
-	sprite_filename: cstring,
+Enteties :: map[string]Entity
+Entity :: struct{
+	entity: ecs.Entity,
+	tags: [dynamic]cstring
 }
+//Entity inits
 
 init_items :: proc(){
 	init_weapons()
 }
 
-// ITEM HOLDER
-Item_holder :: struct{
-	pos: Vec2,
-	rot: Vec3,
-	size: Vec2,
-	item: EntityComponents,
-	sprite_id: cstring,
-}
-
-init_item_holder :: proc(holder: ^Item_holder){
-	assert(holder.item["item"] != nil)
-	item_data := holder.item["item"]
-	log.debug(item_data)
-	//init_sprite(filename = item_data.sprite_filename, pos2 = holder.pos, size = holder.size, id = holder.sprite_id)
-}
-
-update_item_holder :: proc(holder: ^Item_holder, pos: Vec2, rot: Vec3){
-	//the players item holder
-	item := holder.item
-}
-
-// WEAPONS
-
-gun_weapon_data: Projectile_weapon
-gun_item_data: item_data
-gun_item: EntityComponents
-
 init_weapons :: proc(){
 
 	// GUUN
-	gun_weapon_data = Projectile_weapon{
+	gun_weapon_data := Projectile_weapon{
 		projectile_filename = WHITE_IMAGE_PATH,
 		primary_trigger = .X,
 		damage = 10,
 		spread = 0,
 		speed = 20,
 	}
-	gun_item_data = item_data{
+	gun_item_data := Item_data{
 		sprite_filename = WHITE_IMAGE_PATH,
 	}
-	gun_item = EntityComponents{
-		"item" = gun_item_data,
-		"weapon" = gun_weapon_data,
-		"init" = init_projectile_weapon, 
-		"update" = update_projectile_weapon,
+	
+	g.enteties["gun"] = Entity{
+		entity = ecs.create_entity(&ctx),
+		tags = {"item", "pweapon"}
 	}
+	temp, temp2, err := ecs.add_components(&ctx, g.enteties["gun"].entity, gun_weapon_data, gun_item_data)
+}
 
+//COMPONENTS
 
-	g.items["gun"] = gun_item
+Item_data :: struct{
+	sprite_filename: cstring,
+}
+
+init_item :: proc(item_data: Item_data, pos: Vec2, size: Vec2, sprite_id: cstring){
+	init_sprite(item_data.sprite_filename, pos, size, sprite_id)
 }
 
 //projectile weapon
@@ -1083,7 +1066,7 @@ Projectile_weapon :: struct{
 	speed: f32,
 }
 
-init_projectile_weapon :: proc(weapon: Projectile_weapon){
+init_projectile_weapon :: proc(weapon: Projectile_weapon){	
 
 }
 
@@ -1091,6 +1074,38 @@ update_projectile_weapon :: proc(weapon: Projectile_weapon, dt: f32){
 	//Does the projectile weapon things
 	log.debug("weapon update")
 }
+
+
+// ITEM HOLDER
+Item_holder :: struct{
+	pos: Vec2,
+	rot: Vec3,
+	size: Vec2,
+	item: Entity,
+	sprite_id: cstring,
+	equiped: bool,
+}
+
+init_item_holder :: proc(holder: ^Item_holder){
+	item := holder.item
+	assert(item.tags[0] == "item")
+	switch tag2 := item.tags[1]; tag2{
+	case "pweapon":
+		if holder.equiped{
+			pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
+			init_projectile_weapon(pweapon^)
+			item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
+			init_item(item_data^, holder.pos, holder.size, holder.sprite_id)
+		}
+	}
+}
+
+update_item_holder :: proc(holder: Item_holder, pos: Vec2, rot: Vec3){
+	//the players item holder
+}
+
+
+
 
 
 //
@@ -1230,8 +1245,9 @@ init_player :: proc(){
 			pos = {0, 0},
 			rot = {0, 0, 0},
 			size = {0.7, 0.3},
-			item = g.items["gun"],
-			sprite_id = "playerholder"
+			item = g.enteties["gun"],
+			sprite_id = "playerholder",
+			equiped = true,
 		}
 	}
 	g.player.move_speed = g.player.default_move_speed
