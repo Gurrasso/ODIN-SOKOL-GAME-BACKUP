@@ -1154,7 +1154,9 @@ init_weapons :: proc(){
 	gun_weapon_data := Projectile_weapon{
 		trigger = .X,
 		damage = 10,
-		spread = 0,
+		spread = 1,
+		shots = 1,
+		camera_shake = 0.9,
 		projectile = Projectile{
 			img = load_image(WHITE_IMAGE_PATH),
 			size = {0.2, 0.2},
@@ -1194,6 +1196,8 @@ Projectile_weapon :: struct{
 	trigger: sapp.Keycode,
 	damage: f32,
 	spread: f32,
+	shots: int,
+	camera_shake: f32,
 	speed: f32,
 	projectile: Projectile,
 	projectiles: [dynamic]Projectile
@@ -1223,10 +1227,7 @@ init_projectile :: proc(projectile: ^Projectile, shoot_pos: Vec2, shoot_dir: Vec
 	projectile.pos = shoot_pos
 	projectile.dir = shoot_dir
 	projectile.rot = linalg.atan2(projectile.dir.y, projectile.dir.x)
-	//generate an id from the runtime
-	builder := strings.builder_make()
-	strings.write_f32(&builder, g.runtime, 'f')
-  projectile.sprite_id = strings.to_cstring(&builder)
+	
 	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id)
 }
 
@@ -1242,11 +1243,22 @@ init_projectile_weapon :: proc(weapon: ^Projectile_weapon){
 update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir: Vec2, shoot_pos: Vec2){
 	//add a projectile to the array if you press the right trigger
 	if listen_key_single_down(weapon.trigger){
-		append(&weapon.projectiles, weapon.projectile)
-		weapon.projectiles[len(weapon.projectiles)-1].sprite_id = cstring(rawptr(&weapon.projectiles[len(weapon.projectiles)-1]))
-		init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, shoot_dir)
-	
-		shake_camera(0.9)
+		for i := 0; i < weapon.shots; i += 1{
+			
+			append(&weapon.projectiles, weapon.projectile)
+			
+			//generate an id from the runtime
+			builder := strings.builder_make()
+			strings.write_f32(&builder, g.runtime + f32(i), 'f')
+			weapon.projectiles[len(weapon.projectiles)-1].sprite_id = strings.to_cstring(&builder)
+			
+			shoot_dir_offset := Vec2{weapon.spread * rand.float32(), weapon.spread * rand.float32()}
+			shoot_spread_dir := shoot_dir
+
+			init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, shoot_spread_dir)
+		}
+			
+		shake_camera(weapon.camera_shake)
 	}
 	//update the projectiles and check if they should be removed	
 	for i := 0; i < len(weapon.projectiles); i+=1{
