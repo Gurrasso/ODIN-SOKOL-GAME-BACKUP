@@ -42,10 +42,12 @@ package main
 import "base:intrinsics"
 import "base:runtime"
 import "core:log"
+import "core:strings"
 import "core:math"
 import "core:math/linalg"
 import "core:math/noise"
 import "core:math/ease"
+import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:sort"
@@ -852,12 +854,15 @@ update_sprite_image :: proc(img: sg.Image, id: cstring){
 
 //a struct that defines layers with different draw priority
 Draw_layers :: struct{
+	item: i32,
 	default: i32,
 	text: i32,
 	cursor: i32,
 }
 
 draw_layers := Draw_layers{
+	//items
+	item = 0,
 	//default layer
 	default = 1,
 	//text layer
@@ -1147,11 +1152,15 @@ init_weapons :: proc(){
 
 	// GUUN
 	gun_weapon_data := Projectile_weapon{
-		projectile_filename = WHITE_IMAGE_PATH,
-		primary_trigger = .X,
+		trigger = .X,
 		damage = 10,
 		spread = 0,
-		speed = 20,
+		projectile = Projectile{
+			img = load_image(WHITE_IMAGE_PATH),
+			size = {0.2, 0.2},
+			delete_duration = 3,
+			speed = 20,
+		},
 	}
 	gun_item_data := Item_data{
 		img = load_image(WHITE_IMAGE_PATH),
@@ -1173,7 +1182,7 @@ Item_data :: struct{
 }
 
 init_item :: proc(item_data: Item_data, pos: Vec2, sprite_id: cstring){
-	init_sprite(item_data.img, pos, item_data.size, sprite_id)
+	init_sprite(item_data.img, pos, item_data.size, sprite_id, draw_priority = draw_layers.item)
 }
 
 update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: cstring){
@@ -1182,23 +1191,79 @@ update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: cstr
 
 //projectile weapon
 Projectile_weapon :: struct{
-	projectile_filename: cstring,
-	primary_trigger: sapp.Keycode,
+	trigger: sapp.Keycode,
 	damage: f32,
 	spread: f32,
 	speed: f32,
+	projectile: Projectile,
+	projectiles: [dynamic]Projectile
 }
 
-init_projectile_weapon :: proc(weapon: Projectile_weapon){	
-
+Projectile :: struct{
+	img: sg.Image,
+	pos: Vec2,
+	rot: f32,
+	size: Vec2,
+	sprite_id: cstring,
+	duration: f32,
+	delete_duration: f32,
+	speed: f32,
+	dir: Vec2,
 }
 
-update_projectile_weapon :: proc(weapon: Projectile_weapon, dt: f32){
-	//Does the projectile weapon things
+//update the projectile
+update_projectile :: proc(projectile: ^Projectile, dt: f32){
+	projectile.duration += dt
+	projectile.pos += projectile.dir * projectile.speed * dt
+	update_sprite(pos = projectile.pos, rot3 = Vec3{0, 0, linalg.to_degrees(projectile.rot)}, id = projectile.sprite_id)
+}
+
+//init a projectile
+init_projectile :: proc(projectile: ^Projectile, shoot_pos: Vec2, shoot_dir: Vec2){
+	projectile.pos = shoot_pos
+	projectile.dir = shoot_dir
+	projectile.rot = linalg.atan2(projectile.dir.y, projectile.dir.x)
+	//generate an id from the runtime
+	builder := strings.builder_make()
+	strings.write_f32(&builder, g.runtime, 'f')
+  projectile.sprite_id = strings.to_cstring(&builder)
+	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id)
+}
+
+//remove the projectile sprite
+remove_projectile :: proc(projectile: ^Projectile){
+	remove_object(projectile.sprite_id)
+}
+
+init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
+	
+}
+
+update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir: Vec2, shoot_pos: Vec2){
+	//add a projectile to the array if you press the right trigger
+	if listen_key_single_down(weapon.trigger){
+		append(&weapon.projectiles, weapon.projectile)
+		weapon.projectiles[len(weapon.projectiles)-1].sprite_id = cstring(rawptr(&weapon.projectiles[len(weapon.projectiles)-1]))
+		init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, shoot_dir)
+	
+		shake_camera(0.9)
+	}
+	//update the projectiles and check if they should be removed	
+	for i := 0; i < len(weapon.projectiles); i+=1{
+		update_projectile(&weapon.projectiles[i], dt)
+		
+
+		if weapon.projectiles[i].duration > weapon.projectile.delete_duration{
+			remove_projectile(&weapon.projectiles[i])
+			ordered_remove(&weapon.projectiles, i)
+		}
+	}
 }
 
 
 // ITEM HOLDER
+
+//item holder is an obj that can display and update an entity with the item tag
 Item_holder :: struct{
 	pos: Vec2,
 	rot: Vec3,
@@ -1207,6 +1272,7 @@ Item_holder :: struct{
 	equiped: bool,
 }
 
+//init an item holder and check for certain tags
 init_item_holder :: proc(holder: ^Item_holder){
 	item := holder.item
 	assert(contains(item.tags, Entity_tags.Item))
@@ -1215,7 +1281,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 	case .Projectile_weapon:
 		if holder.equiped{
 			pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
-			init_projectile_weapon(pweapon^)
+			init_projectile_weapon(&pweapon^)
 		}
 	}
 
@@ -1223,14 +1289,16 @@ init_item_holder :: proc(holder: ^Item_holder){
 	init_item(item_data^, holder.pos, holder.sprite_id)
 }
 
-update_item_holder :: proc(holder: Item_holder, dt: f32){
+
+//update the item holder and check for certain tags
+update_item_holder :: proc(holder: Item_holder, dt: f32, look_dir: Vec2 = {0, 0}, shoot_pos: Vec2 = {0, 0}){
 	//the players item holder
 	item := holder.item
 	#partial switch tag2 := item.tags[get_next_index(item.tags, Entity_tags.Item)]; tag2{
 	case .Projectile_weapon:
 		if holder.equiped{
 			pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
-			update_projectile_weapon(pweapon^, dt)
+			update_projectile_weapon(&pweapon^, dt, look_dir, shoot_pos)
 		}		
 	}
 
@@ -1355,7 +1423,7 @@ Player :: struct{
 	duration: f32,
 
 	holder: Item_holder,
-	item_offset: f32,
+	item_offset: Vec2,
 }
 
 init_player :: proc(){
@@ -1384,11 +1452,10 @@ init_player :: proc(){
 		},
 		
 		//how far away from the player an item is
-		item_offset = 0.3,
+		item_offset = Vec2{0.2, -0.05},
 	}
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
-
 
 	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
 	init_item_holder(&g.player.holder)
@@ -1460,11 +1527,12 @@ update_player :: proc(dt: f32) {
 
 	//pos
 	holder_item_data, holder_item_err := ecs.get_component(&ctx, g.player.holder.item.entity, Item_data)
-	holder_offset := (g.player.item_offset + (holder_item_data^.size/2)) * (g.player.xflip)
-	holder_pos := Vec2{g.player.item_offset*-g.player.xflip, g.player.pos.y}
+	holder_offset := holder_item_data^.size.x/2
+	holder_pos := Vec2{(g.player.item_offset.x + holder_offset)*-g.player.xflip, g.player.pos.y}
 
 	holder_rotation_vector := linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
-	g.player.holder.pos = g.player.pos + (holder_rotation_vector*g.player.item_offset)
+	g.player.holder.pos = g.player.pos + (holder_rotation_vector*g.player.item_offset.x)
+	g.player.holder.pos.y += g.player.item_offset.y
 	g.player.holder.pos.x += holder_pos.x
 
 	//rot
@@ -1472,8 +1540,11 @@ update_player :: proc(dt: f32) {
 	holder_rotation := linalg.to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
 	g.player.holder.rot.z = holder_rotation
 	g.player.holder.rot.y = g.player.rot.z 
-	//update	
-	update_item_holder(g.player.holder, dt)
+	
+	//where the bullet should come from if it is a gun
+	shoot_pos_offset := holder_rotation_vector * holder_item_data.size.x/2
+	shoot_pos := g.player.holder.pos + shoot_pos_offset
+	update_item_holder(g.player.holder, dt, holder_rotation_vector, shoot_pos)
 
 	//creates a player rotation based of the movement
 	g.player.rot.z = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
@@ -1863,6 +1934,11 @@ move_camera_3D :: proc(dt: f32) {
 	g.camera.position += motion
 
 	g.camera.target = g.camera.position + forward
+}
+
+//shake the camera by setting the trauma
+shake_camera :: proc(trauma: f32){
+	g.camera.camera_shake.trauma = trauma
 }
 
 
