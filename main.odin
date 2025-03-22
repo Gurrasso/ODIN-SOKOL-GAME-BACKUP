@@ -155,7 +155,10 @@ main :: proc(){
 	//logger
 	context.logger = log.create_console_logger()
 	default_context = context
+	
+	ctx = ecs.init_ecs()
 
+	defer ecs.deinit_ecs(&ctx)
 
 	//sokol app
 	sapp.run({
@@ -183,8 +186,6 @@ main :: proc(){
 //initialization
 init_cb :: proc "c" (){
 	context = default_context
-	ctx = ecs.init_ecs()
-	defer ecs.deinit_ecs(&ctx)
 
 	//setup for the sokol graphics
 	sg.setup({
@@ -521,6 +522,45 @@ sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
 
 }
 
+// array utils
+
+contains :: proc(array: $T, target: $T1) -> bool{
+	is := false
+
+	for element in array{
+		if element == target{
+			is = true
+		}
+	}
+
+	return is
+}
+
+
+// will return 0 if element isnt found
+get_index :: proc(array: $T, target: $T1) -> int{
+	index: int = 0
+
+	for i := 0; i < len(array); i+=1{
+		if array[i] == target{
+				index = i
+		}
+	}
+
+	return index
+}
+
+get_next_index :: proc(array: $T, target: $T1) -> int{
+	index := 0
+	target_index := get_index(array, target) 
+	if target_index < len(array)-1{
+		index = target_index + 1
+	}
+
+	return index
+}
+
+
 //buffer util
 
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
@@ -701,9 +741,36 @@ update_object :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 	}
 }
 
+init_sprite :: proc{
+	init_sprite_filename,
+	init_sprite_img,
+}
+
+init_sprite_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+
+
+	//color offset
+	WHITE :: sg.Color { 1,1,1,1 }
+
+	DEFAULT_UV :: Vec4 { 0,0,1,1 }
+
+
+	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
+
+
+	append(&g.objects, Object{
+		{pos.x, pos.y, 0},
+		{0, 0, 0},
+		img,
+		vertex_buffer,
+		id,
+		draw_priority,
+	})
+}
+
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_sprite_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 
 	//color offset
@@ -733,11 +800,11 @@ update_sprite :: proc{
 	update_sprite_image,
 }
 
-update_sprite_pos_rot_image :: proc(filename: cstring, pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+update_sprite_pos_rot_image :: proc(img: sg.Image, pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
 
 	for &obj in g.objects{
 		if obj.id == id{
-			obj.img = load_image(filename)
+			if img != obj.img do obj.img = img 
 			obj.pos = {pos.x, pos.y, 0}
 			obj.rot = {rot3.x, rot3.y, rot3.z}
 		}
@@ -773,11 +840,11 @@ update_sprite_rot :: proc(rot3: Vec3 = { 0,0,0 }, id: cstring){
 	}
 }
 
-update_sprite_image :: proc(filename: cstring, id: cstring){
+update_sprite_image :: proc(img: sg.Image, id: cstring){
 
 	for &obj in g.objects{
 		if obj.id == id{			
-			obj.img = load_image(filename)
+			if img != obj.img do obj.img = img 
 		}
 	}
 }
@@ -1087,7 +1154,8 @@ init_weapons :: proc(){
 		speed = 20,
 	}
 	gun_item_data := Item_data{
-		sprite_filename = WHITE_IMAGE_PATH,
+		img = load_image(WHITE_IMAGE_PATH),
+		size = {0.46, 0.2}
 	}
 	
 	g.enteties["gun"] = Entity{
@@ -1100,15 +1168,16 @@ init_weapons :: proc(){
 //COMPONENTS
 
 Item_data :: struct{
-	sprite_filename: cstring,
+	img: sg.Image,
+	size: Vec2,
 }
 
-init_item :: proc(item_data: Item_data, pos: Vec2, size: Vec2, sprite_id: cstring){
-	init_sprite(item_data.sprite_filename, pos, size, sprite_id)
+init_item :: proc(item_data: Item_data, pos: Vec2, sprite_id: cstring){
+	init_sprite(item_data.img, pos, item_data.size, sprite_id)
 }
 
 update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: cstring){
-	update_sprite(filename = item_data.sprite_filename, pos = pos, rot3 = rot3, id = sprite_id)
+	update_sprite(img = item_data.img, pos = pos, rot3 = rot3, id = sprite_id)
 }
 
 //projectile weapon
@@ -1126,7 +1195,6 @@ init_projectile_weapon :: proc(weapon: Projectile_weapon){
 
 update_projectile_weapon :: proc(weapon: Projectile_weapon, dt: f32){
 	//Does the projectile weapon things
-	log.debug("weapon update")
 }
 
 
@@ -1134,7 +1202,6 @@ update_projectile_weapon :: proc(weapon: Projectile_weapon, dt: f32){
 Item_holder :: struct{
 	pos: Vec2,
 	rot: Vec3,
-	size: Vec2,
 	item: Entity,
 	sprite_id: cstring,
 	equiped: bool,
@@ -1142,31 +1209,33 @@ Item_holder :: struct{
 
 init_item_holder :: proc(holder: ^Item_holder){
 	item := holder.item
-	assert(item.tags[0] == .Item)
-	#partial switch tag2 := item.tags[1]; tag2{
+	assert(contains(item.tags, Entity_tags.Item))
+
+	#partial switch tag2 := item.tags[get_next_index(item.tags, Entity_tags.Item)]; tag2{
 	case .Projectile_weapon:
 		if holder.equiped{
 			pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
 			init_projectile_weapon(pweapon^)
 		}
-
-		item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
-		init_item(item_data^, holder.pos, holder.size, holder.sprite_id)
 	}
+
+	item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
+	init_item(item_data^, holder.pos, holder.sprite_id)
 }
 
 update_item_holder :: proc(holder: Item_holder, dt: f32){
 	//the players item holder
 	item := holder.item
-	#partial switch tag2 := item.tags[1]; tag2{
+	#partial switch tag2 := item.tags[get_next_index(item.tags, Entity_tags.Item)]; tag2{
 	case .Projectile_weapon:
 		if holder.equiped{
-			//pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
-			//update_projectile_weapon(pweapon^, dt)
-		}
-		//item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
-		//update_item(item_data^, holder.pos, holder.rot, holder.sprite_id)
+			pweapon, err := ecs.get_component(&ctx, item.entity, Projectile_weapon)
+			update_projectile_weapon(pweapon^, dt)
+		}		
 	}
+
+	item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
+	update_item(item_data^, holder.pos, holder.rot, holder.sprite_id)
 }
 
 
@@ -1268,8 +1337,8 @@ Player :: struct{
 	sprite_filename: cstring,
 	pos: Vec2,
 	size: Vec2,
-	rot: f32,
-	xflip_rot: f32,
+	rot: Vec3,
+	xflip: f32,
 	
 	move_dir: Vec2,
 	look_dir: Vec2,
@@ -1286,6 +1355,7 @@ Player :: struct{
 	duration: f32,
 
 	holder: Item_holder,
+	item_offset: f32,
 }
 
 init_player :: proc(){
@@ -1296,9 +1366,8 @@ init_player :: proc(){
 		
 		pos = {0, 0},
 		size ={1, 1},
-		rot = 0,
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
-		xflip_rot = 0,
+		xflip = 0,
 		
 		move_dir = {1, 0},
 		default_move_speed = 4,
@@ -1309,11 +1378,13 @@ init_player :: proc(){
 		holder = {
 			pos = {0, 0},
 			rot = {0, 0, 0},
-			size = {0.7, 0.3},
 			item = g.enteties["gun"],
 			sprite_id = "playerholder",
 			equiped = true,
-		}
+		},
+		
+		//how far away from the player an item is
+		item_offset = 0.3,
 	}
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
@@ -1351,10 +1422,12 @@ update_player :: proc(dt: f32) {
 	motion : Vec2
 	
 	if g.cursor.pos.x+g.camera.position.x <= g.player.pos.x{
-		g.player.xflip_rot = 180
+		g.player.xflip = 1
 	} else {
-		g.player.xflip_rot = 0
+		g.player.xflip = -1
 	}
+
+	g.player.rot.y = (g.player.xflip + 1) * 90
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
@@ -1383,14 +1456,30 @@ update_player :: proc(dt: f32) {
 	
 	motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
 
+	//update the item holder of the player
 
+	//pos
+	holder_item_data, holder_item_err := ecs.get_component(&ctx, g.player.holder.item.entity, Item_data)
+	holder_offset := (g.player.item_offset + (holder_item_data^.size/2)) * (g.player.xflip)
+	holder_pos := Vec2{g.player.item_offset*-g.player.xflip, g.player.pos.y}
+
+	holder_rotation_vector := linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	g.player.holder.pos = g.player.pos + (holder_rotation_vector*g.player.item_offset)
+	g.player.holder.pos.x += holder_pos.x
+
+	//rot
+
+	holder_rotation := linalg.to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
+	g.player.holder.rot.z = holder_rotation
+	g.player.holder.rot.y = g.player.rot.z 
+	//update	
 	update_item_holder(g.player.holder, dt)
 
 	//creates a player rotation based of the movement
-	g.player.rot = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
+	g.player.rot.z = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
 
 	g.player.pos += motion
-	update_sprite(pos = g.player.pos, rot3 = {0, g.player.xflip_rot, g.player.rot}, id = g.player.id)
+	update_sprite(pos = g.player.pos, rot3 = g.player.rot, id = g.player.id)
 }
 
 
@@ -1411,7 +1500,7 @@ update_player_abilities :: proc(dt: f32){
 	if listen_key_single_down(g.player.dash.button){
 		g.player.dash.enabled = true
 	}
-	if g.player.dash.enabled == true{
+	if g.player.dash.enabled{
 		update_player_dash(&g.player.dash, dt)
 	}
 }
@@ -1498,7 +1587,7 @@ init_player_sprint :: proc(){
 }
 
 update_sprint :: proc(){
-	if g.player.sprint.enabled == true do g.player.move_speed = g.player.sprint.speed
+	if g.player.sprint.enabled do g.player.move_speed = g.player.sprint.speed
 	else do g.player.move_speed = g.player.default_move_speed
 }
 
