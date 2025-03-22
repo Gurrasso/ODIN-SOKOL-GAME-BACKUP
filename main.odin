@@ -6,17 +6,20 @@ package main
 /*
 	TODO: 
 	
-	use hashmaps for the fonts?, 
+	use hashmaps for the fonts, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working
 
 	add updating size of objects,
 
-	sprite sheet rendering, 
-	animation system thing?, 
+	use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array
+
+	sprite sheet rendering,
+	animation system thing?,
 	
 	tilemap and other environment/map things,
+	
 	lighting(normalmaps),
 	antialiasing,
 	resolution scaling,
