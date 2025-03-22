@@ -32,6 +32,10 @@ package main
 		-make it so cursor cant go outside screen,
 
 	use enteties for abilities
+	
+	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity,
+	this also means that if we switch item the projectiles will keep being rendered but not updated.
+		Fix by making a proc for swithing the item on an item holder
 
 */
 
@@ -1203,6 +1207,7 @@ Projectile_weapon :: struct{
 	projectiles: [dynamic]Projectile
 }
 
+//projectile
 Projectile :: struct{
 	img: sg.Image,
 	pos: Vec2,
@@ -1236,10 +1241,12 @@ remove_projectile :: proc(projectile: ^Projectile){
 	remove_object(projectile.sprite_id)
 }
 
+//init function that runs on item_holder init
 init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
 	
 }
 
+//update function runs that runs every frame inside of item holder ( only if the item is equiped ofc )
 update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir: Vec2, shoot_pos: Vec2){
 	//add a projectile to the array if you press the right trigger
 	if listen_key_single_down(weapon.trigger){
