@@ -35,7 +35,8 @@ package main
 	custom cursor,
 		-make it so cursor cant go outside screen,
 
-	use enteties for abilities
+	use enteties for abilities?
+	create a transform struct instead of every object having a pos, rot, size, ect
 	
 	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity,
 	this also means that if we switch item the projectiles will keep being rendered but not updated.
@@ -1197,6 +1198,12 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 
 
 // ENTETIES
+/*
+	Enteties uses the odin-ecs lib and is mainly meant for items and other stuff that cant be type specific
+	( I need to be able to give any item to my player regardless of what type it is or what data it has )
+*/
+
+
 Enteties :: map[string]Entity
 Entity :: struct{
 	entity: ecs.Entity,
