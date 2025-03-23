@@ -14,6 +14,7 @@ package main
 	add updating size of objects,
 
 	use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array
+		-optimize use of repeted vertex buffers and other stuff
 
 	sprite sheet rendering,
 	animation system thing?,
@@ -38,7 +39,7 @@ package main
 	
 	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity,
 	this also means that if we switch item the projectiles will keep being rendered but not updated.
-		Fix by making a proc for swithing the item on an item holder
+		Fix by making a proc for swithing the item on an item holder and making the projectiles specific for each item holder
 
 */
 
@@ -105,6 +106,12 @@ Vertex_Data :: struct{
 	tex_index: u8,
 }
 
+Vertex_buffers :: struct{
+	data: []Vertex_Data,
+	uv_data: Vec4,
+	buffer: sg.Buffer,
+}
+
 // Handle multiple objects
 Object :: struct{
 	pos: Vec3,
@@ -135,6 +142,7 @@ Globals :: struct {
 	// Game state stuff
 	should_quit: bool,
 	runtime: f32,
+	frame_count: i32,
 	//graphics stuff
 	shader: sg.Shader,
 	pipeline: sg.Pipeline,
@@ -148,6 +156,9 @@ Globals :: struct {
 	player: Player,
 	cursor: Cursor,
 
+
+	//used to avoid initing multiple of the same buffer
+	vertex_buffers: [dynamic]Vertex_buffers,
 
 	fonts: [dynamic]FONT_INFO,
 	enteties: Enteties,
@@ -572,6 +583,7 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 
 //buffer util
 
+// checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
 	vertices := []Vertex_Data {
 		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index	},
@@ -579,7 +591,31 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_ind
 		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index	},
 		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index	},
 	}
-	buffer := sg.make_buffer({ data = sg_range(vertices)})
+	buffer: sg.Buffer
+	
+	buffer_exists: bool = false
+	for vertex_buffer in g.vertex_buffers{
+		buffer_sim: int
+		if vertex_buffer.uv_data == uvs{
+			for i := 0; i < len(vertex_buffer.data); i += 1{
+				if vertex_buffer.data[i] == vertices[i] do buffer_sim += 1
+			}
+		}
+		
+		if buffer_sim == len(vertex_buffer.data){
+			buffer_exists = true
+			buffer = vertex_buffer.buffer
+			break
+		}
+	}
+	if buffer_exists == false{
+		buffer = sg.make_buffer({ data = sg_range(vertices)})
+		append(&g.vertex_buffers, Vertex_buffers{
+			data = vertices,
+			buffer = buffer,
+			uv_data = uvs,
+		})
+	}
 
 	return buffer
 }
@@ -670,6 +706,18 @@ get_vector_magnitude :: proc(vec: Vec2) -> f32{
 	return magv
 }
 
+add_randomness_vec2 :: proc(vec: Vec2, randomness: f32) -> Vec2{
+	unit_vector := linalg.normalize0(vec)
+
+	random_angle := rand.float32_range(-randomness, randomness)
+
+	new_x := unit_vector.x * math.cos(random_angle) - unit_vector.y * math.sin(random_angle)
+	new_y := unit_vector.x * math.sin(random_angle) + unit_vector.y * math.cos(random_angle)
+
+	magnitude := get_vector_magnitude(vec)
+	return Vec2{new_x * magnitude, new_y * magnitude}
+}
+
 //spring physics
 update_spring :: proc(spring: ^Spring, dt: f32){
 
@@ -738,7 +786,6 @@ init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, siz
 		draw_priority,
 	})
 }
-
 
 //proc for updating objects
 update_object :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
@@ -975,7 +1022,8 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		char_pos := Vec2{xform[3][0], xform[3][1]}
 
 		char_obj := generate_char_object(char_pos, text_size, uv, color, atlas_image)
-		
+
+
 		append(&text_objects, char_obj)
 
 		x +=	advance_x
@@ -1076,7 +1124,6 @@ generate_char_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset
 
 	// vertices
 	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, tex_index)
-
 	char_obj := Char_object{
 		{pos2.x, pos2.y, 0},
 		{0, 0},
@@ -1161,13 +1208,13 @@ init_weapons :: proc(){
 	gun_weapon_data := Projectile_weapon{
 		trigger = .X,
 		damage = 10,
-		spread = 1,
-		shots = 1,
+		spread = 0.2,
+		shots = 3,
 		camera_shake = 0.9,
 		projectile = Projectile{
 			img = load_image(WHITE_IMAGE_PATH),
 			size = {0.2, 0.2},
-			delete_duration = 3,
+			delete_duration = 2,
 			speed = 20,
 		},
 	}
@@ -1200,26 +1247,66 @@ update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: cstr
 
 //projectile weapon
 Projectile_weapon :: struct{
+	//shoot button
 	trigger: sapp.Keycode,
 	damage: f32,
+	//a radian value that uses the add_randomness_vec2 function to add some randomness to the projectile directions
 	spread: f32,
+	//number of shots the weapon fires
 	shots: int,
+	//add some camera shake to the shot
 	camera_shake: f32,
-	speed: f32,
+	//the default values of the projectiles
 	projectile: Projectile,
+	//an array of all the active projectiles
 	projectiles: [dynamic]Projectile
+}
+
+//init function that runs on item_holder init
+init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
+	
+}
+
+//update function runs that runs every frame inside of item holder ( only if the item is equiped ofc )
+update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir: Vec2, shoot_pos: Vec2){
+	//add a projectile to the array if you press the right trigger
+	if listen_key_single_down(weapon.trigger){
+		for i := 0; i < weapon.shots; i += 1{
+			
+			append(&weapon.projectiles, weapon.projectile)
+			
+			//generate an id from the frame count
+			builder := strings.builder_make()
+			strings.write_f32(&builder, f32(g.frame_count) + f32(i), 'f')
+			weapon.projectiles[len(weapon.projectiles)-1].sprite_id = strings.to_cstring(&builder)
+			
+			init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, add_randomness_vec2(shoot_dir, weapon.spread))
+		}
+			
+		shake_camera(weapon.camera_shake)
+	}
+	//update the projectiles and check if they should be removed	
+	for i := 0; i < len(weapon.projectiles); i+=1{
+		update_projectile(&weapon.projectiles[i], dt)
+
+		if weapon.projectiles[i].duration > weapon.projectile.delete_duration{
+			remove_projectile(&weapon.projectiles[i])
+			ordered_remove(&weapon.projectiles, i)
+		}
+	}
 }
 
 //projectile
 Projectile :: struct{
 	img: sg.Image,
-	pos: Vec2,
-	rot: f32,
 	size: Vec2,
-	sprite_id: cstring,
-	duration: f32,
 	delete_duration: f32,
 	speed: f32,
+	
+	pos: Vec2,
+	rot: f32,
+	sprite_id: cstring,
+	duration: f32,
 	dir: Vec2,
 }
 
@@ -1244,43 +1331,6 @@ remove_projectile :: proc(projectile: ^Projectile){
 	remove_object(projectile.sprite_id)
 }
 
-//init function that runs on item_holder init
-init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
-	
-}
-
-//update function runs that runs every frame inside of item holder ( only if the item is equiped ofc )
-update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir: Vec2, shoot_pos: Vec2){
-	//add a projectile to the array if you press the right trigger
-	if listen_key_single_down(weapon.trigger){
-		for i := 0; i < weapon.shots; i += 1{
-			
-			append(&weapon.projectiles, weapon.projectile)
-			
-			//generate an id from the runtime
-			builder := strings.builder_make()
-			strings.write_f32(&builder, g.runtime + f32(i), 'f')
-			weapon.projectiles[len(weapon.projectiles)-1].sprite_id = strings.to_cstring(&builder)
-			
-			shoot_dir_offset := Vec2{weapon.spread * rand.float32(), weapon.spread * rand.float32()}
-			shoot_spread_dir := shoot_dir
-
-			init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, shoot_spread_dir)
-		}
-			
-		shake_camera(weapon.camera_shake)
-	}
-	//update the projectiles and check if they should be removed	
-	for i := 0; i < len(weapon.projectiles); i+=1{
-		update_projectile(&weapon.projectiles[i], dt)
-		
-
-		if weapon.projectiles[i].duration > weapon.projectile.delete_duration{
-			remove_projectile(&weapon.projectiles[i])
-			ordered_remove(&weapon.projectiles, i)
-		}
-	}
-}
 
 
 // ITEM HOLDER
@@ -1358,7 +1408,6 @@ init_game_state :: proc(){
 }
 
 update_game_state :: proc(dt: f32){
-
 	event_listener()
 
 	// move_camera_3D(dt)
@@ -1373,6 +1422,7 @@ update_game_state :: proc(dt: f32){
 
 	mouse_move = {}
 	g.runtime += dt
+	g.frame_count += 1
 }
 
 //proc for quiting the game
