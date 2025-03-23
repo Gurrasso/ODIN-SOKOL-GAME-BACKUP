@@ -1199,7 +1199,7 @@ update_text_pos :: proc(pos: Vec2, id: cstring){
 
 // ENTETIES
 /*
-	Enteties uses the odin-ecs lib and is mainly meant for items and other stuff that cant be type specific
+	Enteties uses the odin-ecs lib and is mainly meant for items and other stuff that can't be type specific
 	( I need to be able to give any item to my player regardless of what type it is or what data it has )
 */
 
