@@ -718,6 +718,17 @@ add_randomness_vec2 :: proc(vec: Vec2, randomness: f32) -> Vec2{
 	return Vec2{new_x * magnitude, new_y * magnitude}
 }
 
+offset_vec2 :: proc(vec: Vec2, offset: f32) -> Vec2{
+	unit_vector := linalg.normalize0(vec)
+
+
+	new_x := unit_vector.x * math.cos(offset) - unit_vector.y * math.sin(offset)
+	new_y := unit_vector.x * math.sin(offset) + unit_vector.y * math.cos(offset)
+
+	magnitude := get_vector_magnitude(vec)
+	return Vec2{new_x * magnitude, new_y * magnitude}
+}
+
 //spring physics
 update_spring :: proc(spring: ^Spring, dt: f32){
 
@@ -1196,39 +1207,19 @@ Entity_tags :: enum{
 	Item,
 	Projectile_weapon,
 }
-//Entity inits
 
-init_items :: proc(){
-	init_weapons()
-}
-
-init_weapons :: proc(){
-
-	// GUUN
-	gun_weapon_data := Projectile_weapon{
-		trigger = .X,
-		damage = 10,
-		spread = 0.2,
-		shots = 3,
-		camera_shake = 0.9,
-		projectile = Projectile{
-			img = load_image(WHITE_IMAGE_PATH),
-			size = {0.2, 0.2},
-			delete_duration = 2,
-			speed = 20,
-		},
-	}
-	gun_item_data := Item_data{
-		img = load_image(WHITE_IMAGE_PATH),
-		size = {0.46, 0.2}
-	}
-	
-	g.enteties["gun"] = Entity{
+create_entity :: proc(id: string, tags: [dynamic]Entity_tags){
+	g.enteties[id] = Entity{
 		entity = ecs.create_entity(&ctx),
-		tags = {.Item, .Projectile_weapon}
+		tags = tags,
 	}
-	temp, temp2, err := ecs.add_components(&ctx, g.enteties["gun"].entity, gun_weapon_data, gun_item_data)
 }
+
+entity_add_component :: proc(id: string, component: $T){
+	temp, error := ecs.add_component(&ctx, g.enteties[id].entity, component)
+	if error != ecs.ECS_Error.NO_ERROR do log.debug(error)
+}
+
 
 //COMPONENTS
 
@@ -1251,6 +1242,8 @@ Projectile_weapon :: struct{
 	trigger: sapp.Keycode,
 	damage: f32,
 	//a radian value that uses the add_randomness_vec2 function to add some randomness to the projectile directions
+	random_spread: f32,
+	//how far apart shots will be
 	spread: f32,
 	//number of shots the weapon fires
 	shots: int,
@@ -1279,8 +1272,15 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, dt: f32, shoot_dir:
 			builder := strings.builder_make()
 			strings.write_f32(&builder, f32(g.frame_count) + f32(i), 'f')
 			weapon.projectiles[len(weapon.projectiles)-1].sprite_id = strings.to_cstring(&builder)
-			
-			init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, add_randomness_vec2(shoot_dir, weapon.spread))
+		
+			//offset position of shots if we shoot multiple
+			shoot_dir := shoot_dir
+			if weapon.shots > 1{
+				offset := (f32(i)-math.floor(f32(weapon.shots/2)))	* weapon.spread
+				shoot_dir = offset_vec2(shoot_dir, offset)
+			}
+
+			init_projectile(&weapon.projectiles[len(weapon.projectiles)-1], shoot_pos, add_randomness_vec2(shoot_dir, weapon.random_spread))
 		}
 			
 		shake_camera(weapon.camera_shake)
@@ -1318,9 +1318,9 @@ update_projectile :: proc(projectile: ^Projectile, dt: f32){
 }
 
 //init a projectile
-init_projectile :: proc(projectile: ^Projectile, shoot_pos: Vec2, shoot_dir: Vec2){
+init_projectile :: proc(projectile: ^Projectile, shoot_pos: Vec2, dir: Vec2){
 	projectile.pos = shoot_pos
-	projectile.dir = shoot_dir
+	projectile.dir = dir
 	projectile.rot = linalg.atan2(projectile.dir.y, projectile.dir.x)
 	
 	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id)
@@ -1377,8 +1377,6 @@ update_item_holder :: proc(holder: Item_holder, dt: f32, look_dir: Vec2 = {0, 0}
 	item_data, err1 := ecs.get_component(&ctx, item.entity, Item_data)
 	update_item(item_data^, holder.pos, holder.rot, holder.sprite_id)
 }
-
-
 
 
 
@@ -1500,6 +1498,7 @@ Player :: struct{
 
 init_player :: proc(){
 	// setup the player
+
 	g.player = Player{
 		id = "Player",
 		sprite_filename = "./source/assets/textures/Random.png",
@@ -1524,12 +1523,14 @@ init_player :: proc(){
 		},
 		
 		//how far away from the player an item is
-		item_offset = Vec2{0.2, -0.05},
+		item_offset = Vec2{0.3, -0.05},
 	}
 	g.player.move_speed = g.player.default_move_speed
 	init_player_abilities()
 
+	//init the players sprite
 	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
+	//init the players item_holder
 	init_item_holder(&g.player.holder)
 }
 
@@ -1547,6 +1548,8 @@ player_deceleration_ease :: proc(x: f32) -> f32 {
 }
 
 update_player :: proc(dt: f32) {
+	player := &g.player
+
 	//changing the move_input with wasd
 	move_input: Vec2
 	if key_down[.W] do move_input.y = 1
@@ -1560,13 +1563,14 @@ update_player :: proc(dt: f32) {
 
 	motion : Vec2
 	
-	if g.cursor.pos.x+g.camera.position.x <= g.player.pos.x{
-		g.player.xflip = 1
+	//for flipping the player sprite
+	if g.cursor.pos.x+g.camera.position.x <= player.pos.x{
+		player.xflip = 1
 	} else {
-		g.player.xflip = -1
+		player.xflip = -1
 	}
 
-	g.player.rot.y = (g.player.xflip + 1) * 90
+	player.rot.y = (player.xflip + 1) * 90
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
@@ -1574,55 +1578,59 @@ update_player :: proc(dt: f32) {
 	
 	//player movement with easing curves
 	if move_input != 0 {
-		g.player.move_dir = up * move_input.y + right * move_input.x
+		player.move_dir = up * move_input.y + right * move_input.x
 		
 		//increase duration with the acceleration
-		g.player.duration += g.player.acceleration * dt
+		player.duration += player.acceleration * dt
 		//clamp the duration between 0 and 1
-		g.player.duration = math.clamp(g.player.duration, 0, 1)
+		player.duration = math.clamp(player.duration, 0, 1)
 		//the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
-		g.player.current_move_speed = g.player.move_speed * player_acceleration_ease(g.player.duration)
+		player.current_move_speed = player.move_speed * player_acceleration_ease(g.player.duration)
 	} else {
 		
 		//the duration decreses with the deceleration when not giving any input
-		g.player.duration -= g.player.deceleration * dt
+		player.duration -= player.deceleration * dt
 		//the duration is still clamped between 0 and 1
-		g.player.duration = math.clamp(g.player.duration, 0, 1)
+		player.duration = math.clamp(player.duration, 0, 1)
 		//the speed is set to the desired speed times the deceleration easing of the duration
-		g.player.current_move_speed = g.player.move_speed * player_deceleration_ease(g.player.duration)
+		player.current_move_speed = player.move_speed * player_deceleration_ease(player.duration)
 	}	
 
 	
-	motion = linalg.normalize0(g.player.move_dir) * g.player.current_move_speed * dt
+	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * dt
 
 	//update the item holder of the player
+	holder := &player.holder
 
 	//pos
-	holder_item_data, holder_item_err := ecs.get_component(&ctx, g.player.holder.item.entity, Item_data)
-	holder_offset := holder_item_data^.size.x/2
-	holder_pos := Vec2{(g.player.item_offset.x + holder_offset)*-g.player.xflip, g.player.pos.y}
+	holder_item_data, holder_item_err := ecs.get_component(&ctx, holder.item.entity, Item_data)
+	holder_offset := (holder_item_data^.size.x/2) 
+	holder_rotation_pos := player.pos + ( player.item_offset.x * player.xflip)
+	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, player.pos.y}
 
-	holder_rotation_vector := linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
-	g.player.holder.pos = g.player.pos + (holder_rotation_vector*g.player.item_offset.x)
-	g.player.holder.pos.y += g.player.item_offset.y
-	g.player.holder.pos.x += holder_pos.x
+	holder_rotation_vector := linalg.normalize0(g.cursor.pos-(player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	holder.pos = player.pos + (holder_rotation_vector*(holder_offset))
+	holder.pos.y += player.item_offset.y
+	holder.pos.x += new_holder_pos.x
 
 	//rot
 
-	holder_rotation := linalg.to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
-	g.player.holder.rot.z = holder_rotation
-	g.player.holder.rot.y = g.player.rot.z 
+	new_holder_rotation := linalg.to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
+	holder.rot.z = new_holder_rotation
+	holder.rot.y = player.rot.z 
+
+
 	
 	//where the bullet should come from if it is a gun
 	shoot_pos_offset := holder_rotation_vector * holder_item_data.size.x/2
-	shoot_pos := g.player.holder.pos + shoot_pos_offset
-	update_item_holder(g.player.holder, dt, holder_rotation_vector, shoot_pos)
+	shoot_pos := player.holder.pos + shoot_pos_offset
+	update_item_holder(holder^, dt, holder_rotation_vector, shoot_pos)
 
 	//creates a player rotation based of the movement
-	g.player.rot.z = linalg.to_degrees(math.atan2(g.player.look_dir.y, g.player.look_dir.x))
+	player.rot.z = linalg.to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
 
-	g.player.pos += motion
-	update_sprite(pos = g.player.pos, rot3 = g.player.rot, id = g.player.id)
+	player.pos += motion
+	update_sprite(pos = player.pos, rot3 = player.rot, id = player.id)
 }
 
 
@@ -1732,6 +1740,61 @@ init_player_sprint :: proc(){
 update_sprint :: proc(){
 	if g.player.sprint.enabled do g.player.move_speed = g.player.sprint.speed
 	else do g.player.move_speed = g.player.default_move_speed
+}
+
+//ITEM INITS
+
+init_items :: proc(){
+	init_weapons()
+}
+
+init_weapons :: proc(){
+
+	// GUUN
+	gun_weapon_data := Projectile_weapon{
+		trigger = .X,
+		damage = 10,
+		random_spread = 0.05,
+		shots = 1,
+		camera_shake = 1.3,
+		projectile = Projectile{
+			img = load_image(WHITE_IMAGE_PATH),
+			size = {0.15, 0.15},
+			delete_duration = 2,
+			speed = 25,
+		},
+	}
+	gun_item_data := Item_data{
+		img = load_image(WHITE_IMAGE_PATH),
+		size = {1, 0.2}
+	}
+	
+	create_entity("gun", {.Item, .Projectile_weapon})	
+	entity_add_component("gun", gun_item_data)
+	entity_add_component("gun", gun_weapon_data)
+
+	arvid_weapon_data := Projectile_weapon{
+		trigger = .X,
+		damage = 2,
+		random_spread = 0,
+		shots = 20,
+		spread = 0.05,
+		camera_shake = 1.3,
+		projectile = Projectile{
+			img = load_image(WHITE_IMAGE_PATH),
+			size = {0.1, 0.1},
+			delete_duration = 2,
+			speed = 25,
+		},
+	}
+	arvid_item_data := Item_data{
+		img = load_image(WHITE_IMAGE_PATH),
+		size = {0.7, 0.2}
+	}
+	create_entity("arvid", {.Item, .Projectile_weapon})	
+	entity_add_component("arvid", arvid_item_data)
+	entity_add_component("arvid", arvid_weapon_data)
+
 }
 
 // CURSOR
