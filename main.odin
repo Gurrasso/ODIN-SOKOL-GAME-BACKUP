@@ -1,8 +1,6 @@
 #+feature dynamic-literals
 package main
 
-
-
 /*
 	TODO: 
 	
@@ -107,13 +105,11 @@ Vertex_Data :: struct{
 	tex_index: u8,
 }
 
-Vertex_buffers :: struct{
-	uv_data: Vec4,
-	size_data: Vec2,
-	color_data: sg.Color,
-	tex_index_data: u8,
-	buffer: sg.Buffer,
+Object_group :: struct{
+	objects: [dynamic]Object,
+	vertex_buffer: sg.Buffer,
 }
+
 
 Images :: struct{
 	filename: cstring,
@@ -125,8 +121,6 @@ Object :: struct{
 	pos: Vec3,
 	rot: Vec3,
 	img: sg.Image,
-	vertex_buffer: sg.Buffer,
-	id: cstring,
 	draw_priority: i32,
 }
 
@@ -159,16 +153,12 @@ Globals :: struct {
 	sampler: sg.Sampler,
 	//Objects for drawing
 	text_objects: [dynamic]Text_object,
-	objects: [dynamic]Object,
+	objects: map[string]Object_group,
 	//Things there are only one of
 	camera: Camera,
 	player: Player,
 	cursor: Cursor,
 
-
-	//used to avoid initing multiple of the same buffer
-	vertex_buffers: [dynamic]Vertex_buffers,
-	
 	images: [dynamic]Images,
 
 	fonts: [dynamic]FONT_INFO,
@@ -296,9 +286,9 @@ cleanup_cb :: proc "c" (){
 	context = default_context
 
 	// DESTROY!!!
-	for buffer in g.vertex_buffers{
-		sg.destroy_buffer(buffer.buffer)
-	}	
+	for id in g.objects{
+		sg.destroy_buffer(g.objects[id].vertex_buffer)
+	}
 
 	for image in g.images{
 		sg.destroy_image(image.image)
@@ -377,24 +367,25 @@ frame_cb :: proc "c" (){
 	}
 
 	//do things for all objects
-	for obj in g.objects {
+	for id in g.objects {
+		for obj in g.objects[id].objects{
 		//matrix
-		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
+	
+			//apply the bindings(something that says which things we want to draw)
+			b := sg.Bindings {
+				vertex_buffers = { 0 = g.objects[id].vertex_buffer },
+				index_buffer = g.index_buffer,
+				images = { IMG_tex = obj.img },
+				samplers = { SMP_smp = g.sampler },
+			}
 
-		//apply the bindings(something that says which things we want to draw)
-		b := sg.Bindings {
-			vertex_buffers = { 0 = obj.vertex_buffer },
-			index_buffer = g.index_buffer,
-			images = { IMG_tex = obj.img },
-			samplers = { SMP_smp = g.sampler },
-		}
-
-		append(&draw_data, Draw_data{
-			m = m,
-			b = b,
-			draw_priority = obj.draw_priority,
-		})
-		
+			append(&draw_data, Draw_data{
+				m = m,
+				b = b,
+				draw_priority = obj.draw_priority,
+			})
+		}	
 	}
 
 	//sort the array based on draw_priority
@@ -632,33 +623,8 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_ind
 		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index	},
 		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index	},
 	}
-	buffer: sg.Buffer
 	
-	buffer_exists: bool = false
-	for vertex_buffer in g.vertex_buffers{
-		same_buffer_data := true
-		if vertex_buffer.uv_data != uvs do same_buffer_data = false
-		if vertex_buffer.size_data != size do same_buffer_data = false
-		if vertex_buffer.color_data != color_offset do same_buffer_data = false
-		if vertex_buffer.tex_index_data != tex_index do same_buffer_data = false
-
-		
-		if same_buffer_data{
-			buffer_exists = true
-			buffer = vertex_buffer.buffer
-			break
-		}
-	}
-	if !buffer_exists{
-		buffer = sg.make_buffer({ data = sg_range(vertices)})
-		append(&g.vertex_buffers, Vertex_buffers{
-			buffer = buffer,
-			uv_data = uvs,
-			size_data = size,
-			color_data = color_offset,
-			tex_index_data = tex_index,
-		})
-	}
+	buffer := sg.make_buffer({ data = sg_range(vertices)})
 
 	return buffer
 }
@@ -714,16 +680,11 @@ xform_scale :: proc(scale: Vec2) -> Matrix4 {
 
 //removing objects
 
-remove_object ::	proc(id: cstring){
-	for i := 0; i < len(g.objects); i += 1 {
-		if g.objects[i].id == id{
-			ordered_remove(&g.objects, i)
-			i-=1
-		}
-	}
+remove_object ::	proc(id: string){
+	delete_key(&g.objects, id)
 }
 
-remove_text_object :: proc(id: cstring) {
+remove_text_object :: proc(id: string) {
 	for i := 0; i < len(g.text_objects); i += 1 {
 		if g.text_objects[i].id == id{
 			ordered_remove(&g.text_objects, i)
@@ -740,6 +701,10 @@ vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 
 	new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{centerpos.x, -centerpos.y}
 	return Vec2{new_pos2d.x, -new_pos2d.y} - objpos
+}
+
+vec2_to_vec3 :: proc(vec: Vec2) -> Vec3{
+	return Vec3{vec.x, vec.y, 0}
 }
 
 //math util
@@ -828,38 +793,37 @@ WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: cstring = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, tex_index)
+	same_buffer: bool = true
 
-	append(&g.objects, Object{
+	if id in g.objects{
+		vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, tex_index)
+		g.objects[id] = Object_group{
+			vertex_buffer = vertex_buffer,
+		}
+	}
+
+	object_group := &g.objects[id]
+
+	append(&object_group.objects, Object{
 		{pos.x, pos.y, 0},
 		{0, 0, 0},
 		WHITE_IMAGE,
-		vertex_buffer,
-		id,
 		draw_priority,
-	})
+	})	
+
 }
 
-//proc for updating objects
-update_object :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
-	for &obj in g.objects{
-		if obj.id == id{
-			obj.pos = {pos.x, pos.y, 0}
-			obj.rot = {rot3.x, rot3.y, rot3.z}
-		}
-	}
-}
 
 init_sprite :: proc{
-	init_sprite_filename,
-	init_sprite_img,
+	init_sprite_from_filename,
+	init_sprite_from_img,
 }
 
-init_sprite_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 
 	//color offset
@@ -867,44 +831,32 @@ init_sprite_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
+	same_buffer: bool = true
 
-	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
+	if id in g.objects == false{
+		vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
+		g.objects[id] = Object_group{
+			vertex_buffer = vertex_buffer,
+		}
+	}
 
+	object_group := &g.objects[id]
 
-	append(&g.objects, Object{
+	append(&object_group.objects, Object{
 		{pos.x, pos.y, 0},
 		{0, 0, 0},
 		img,
-		vertex_buffer,
-		id,
 		draw_priority,
 	})
 }
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: cstring = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
-
-
-	//color offset
-	WHITE :: sg.Color { 1,1,1,1 }
-
-	DEFAULT_UV :: Vec4 { 0,0,1,1 }
-
-
-	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
-
-
-	append(&g.objects, Object{
-		{pos.x, pos.y, 0},
-		{0, 0, 0},
-		get_image(filename),
-		vertex_buffer,
-		id,
-		draw_priority,
-	})
+init_sprite_from_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+	init_sprite_from_img(get_image(filename), pos, size, id, tex_index, draw_priority)	
 }
 
+//involves some code duplication
 update_sprite :: proc{
 	update_sprite_pos_rot_image,
 	update_sprite_pos_rot,
@@ -913,54 +865,74 @@ update_sprite :: proc{
 	update_sprite_image,
 }
 
-update_sprite_pos_rot_image :: proc(img: sg.Image, pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+update_sprite_pos_rot_image :: proc(img: sg.Image, pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: string){
+	assert(id in g.objects)
 
-	for &obj in g.objects{
-		if obj.id == id{
-			if img != obj.img do obj.img = img 
-			obj.pos = {pos.x, pos.y, 0}
-			obj.rot = {rot3.x, rot3.y, rot3.z}
+	for &object in g.objects[id].objects{
+		object = Object{
+			vec2_to_vec3(pos),
+			rot3,
+			img,
+			object.draw_priority,
 		}
 	}
 }
 
-update_sprite_pos_rot :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: cstring){
+update_sprite_pos_rot :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: string){
 
-	for &obj in g.objects{
-		if obj.id == id{
-			obj.pos = {pos.x, pos.y, 0}
-			obj.rot = {rot3.x, rot3.y, rot3.z}
+	assert(id in g.objects)
+
+	for &object in g.objects[id].objects{
+		object = Object{
+			vec2_to_vec3(pos),
+			rot3,
+			object.img,
+			object.draw_priority,
 		}
 	}
 }
 
 //proc for updating sprites
-update_sprite_pos :: proc(pos: Vec2, id: cstring){
+update_sprite_pos :: proc(pos: Vec2, id: string){
 
-	for &obj in g.objects{
-		if obj.id == id{			
-			obj.pos = {pos.x, pos.y, 0}
+	assert(id in g.objects)
+
+	for &object in g.objects[id].objects{
+		object = Object{
+			vec2_to_vec3(pos),
+			object.rot,
+			object.img,
+			object.draw_priority,
 		}
 	}
 }
 
-update_sprite_rot :: proc(rot3: Vec3 = { 0,0,0 }, id: cstring){
+update_sprite_rot :: proc(rot3: Vec3 = { 0,0,0 }, id: string){
+	assert(id in g.objects)
 
-	for &obj in g.objects{
-		if obj.id == id{			
-			obj.rot = {rot3.x, rot3.y, rot3.z}
+	for &object in g.objects[id].objects{
+		object = Object{
+			object.pos,
+			rot3,
+			object.img,
+			object.draw_priority,
 		}
 	}
 }
 
-update_sprite_image :: proc(img: sg.Image, id: cstring){
+update_sprite_image :: proc(img: sg.Image, id: string){
+	assert(id in g.objects)
 
-	for &obj in g.objects{
-		if obj.id == id{			
-			if img != obj.img do obj.img = img 
+	for &object in g.objects[id].objects{
+		object = Object{
+			object.pos,
+			object.rot,
+			img,
+			object.draw_priority,
 		}
 	}
 }
+
 //	DRAW_LAYERS
 
 //a struct that defines layers with different draw priority
@@ -1010,12 +982,12 @@ Text_object :: struct{
 	objects: [dynamic]Char_object,
 	pos: Vec2,
 	rot: Vec3,
-	id: cstring,
+	id: string,
 	draw_priority: i32,
 }
 
 FONT_INFO :: struct {
-	id: cstring,
+	id: string,
 	img: sg.Image,
 	width: int,
 	height: int,
@@ -1027,7 +999,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: cstring, text_object_id: cstring = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text) {
 	using stbtt
 
 	rotation : Vec3 = {0, 0, text_rot}
@@ -1091,7 +1063,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 	
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: cstring, text_pos: Vec2, draw_priority: i32){
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: string, text_pos: Vec2, draw_priority: i32){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
@@ -1136,7 +1108,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 }
 
 //initiate font and add it to the g.fonts
-init_font :: proc(font_path: string, font_h: i32 = 16, id: cstring) {
+init_font :: proc(font_path: string, font_h: i32 = 16, id: string) {
 	using stbtt
 	
 	bitmap, _ := mem.alloc(font_bitmap_w * font_bitmap_h)
@@ -1166,7 +1138,7 @@ init_font :: proc(font_path: string, font_h: i32 = 16, id: cstring) {
 }
 
 //stores font data in g.fonts
-store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count]stbtt.bakedchar, font_id: cstring){
+store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count]stbtt.bakedchar, font_id: string){
 	append(&g.fonts, FONT_INFO{
 		id = font_id,
 		img = sg_img,
@@ -1203,13 +1175,13 @@ update_text :: proc{
 }
 
 //not super efficient, might fix later
-update_text_object :: proc(pos: Vec2, rot: f32, id: cstring){
+update_text_object :: proc(pos: Vec2, rot: f32, id: string){
 	update_text_rot(rot, id)
 	update_text_pos(pos, id)
 
 }
 
-update_text_rot :: proc(rot: f32, id: cstring){
+update_text_rot :: proc(rot: f32, id: string){
 
 	rotation := Vec3{0, 0, rot}
 
@@ -1227,7 +1199,7 @@ update_text_rot :: proc(rot: f32, id: cstring){
 	}
 }
 
-update_text_pos :: proc(pos: Vec2, id: cstring){
+update_text_pos :: proc(pos: Vec2, id: string){
 
 	for &text_object in g.text_objects{
 		if text_object.id == id{
@@ -1297,11 +1269,11 @@ Item_data :: struct{
 	size: Vec2,
 }
 
-init_item :: proc(item_data: Item_data, pos: Vec2, sprite_id: cstring){
+init_item :: proc(item_data: Item_data, pos: Vec2, sprite_id: string){
 	init_sprite(item_data.img, pos, item_data.size, sprite_id, draw_priority = draw_layers.item)
 }
 
-update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: cstring){
+update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: string){
 	update_sprite(img = item_data.img, pos = pos, rot3 = rot3, id = sprite_id)
 }
 
@@ -1341,7 +1313,7 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 			//generate an id from the frame count
 			builder := strings.builder_make()
 			strings.write_f32(&builder, f32(g.frame_count) + f32(i), 'f')
-			sprite_id := strings.to_cstring(&builder)
+			sprite_id := strings.to_string(builder)
 		
 			//offset position of shots if we shoot multiple
 			shoot_dir := shoot_dir
@@ -1366,7 +1338,7 @@ Projectile :: struct{
 	
 	pos: Vec2,
 	rot: f32,
-	sprite_id: cstring,
+	sprite_id: string,
 	duration: f32,
 	dir: Vec2,
 }
@@ -1392,7 +1364,7 @@ update_projectile :: proc(projectile: ^Projectile){
 }
 
 //init a projectile
-init_projectile :: proc(projectile_data: Projectile, shoot_pos: Vec2, dir: Vec2, sprite_id: cstring){
+init_projectile :: proc(projectile_data: Projectile, shoot_pos: Vec2, dir: Vec2, sprite_id: string){
 	append(&game_state.projectiles, projectile_data)
 	projectile := &game_state.projectiles[len(game_state.projectiles)-1]
 
@@ -1418,7 +1390,7 @@ Item_holder :: struct{
 	pos: Vec2,
 	rot: Vec3,
 	item: Entity,
-	sprite_id: cstring,
+	sprite_id: string,
 	//if items like guns should be equipped
 	equipped: bool,
 }
@@ -1489,7 +1461,7 @@ init_game_state :: proc(){
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
 
-	init_player()
+	init_player()	
 
 	init_camera()
 
@@ -1552,7 +1524,7 @@ event_listener :: proc(){
 
 // PLAYER
 Player :: struct{
-	id: cstring,
+	id: string,
 	sprite_filename: cstring,
 	pos: Vec2,
 	size: Vec2,
@@ -1590,7 +1562,7 @@ init_player :: proc(){
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
 		//how far over the player you have to go for it to flip
-		xflip_threshold = 0.2,
+		xflip_threshold = 0.25,
 		
 		move_dir = {1, 0},
 		default_move_speed = 4,
@@ -2130,6 +2102,7 @@ update_camera :: proc(){
 
 	update_camera_position(g.camera.asym_obj.position + g.camera.lookahead_asym_obj.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
 }
+
 
 //function for moving around camera in 3D
 move_camera_3D :: proc() {
