@@ -7,13 +7,15 @@ package main
 	use hashmaps for the fonts, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
-	fix text \n not working
+	fix text \n not working,
 
-	add updating size of objects,
+	add updating of vertex_buffers,
 
-	use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array
-		-optimize use of repeted vertex buffers and other stuff
-	automatically give sprite ids instead of having to assign them manually
+	fix projectiles having wrong roation on init,
+
+	use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array,
+		-optimize use of repeted vertex buffers, images and other stuff,
+	automatically give sprite ids instead of having to assign them manually,
 
 	sprite sheet rendering,
 	animation system thing?,
@@ -22,7 +24,7 @@ package main
 	
 	lighting(normalmaps),
 	antialiasing,
-	resolution scaling,
+	resolution scaling?,
 	fix init_icon,
 	
 		-camera shake,
@@ -34,12 +36,12 @@ package main
 	custom cursor,
 		-make it so cursor cant go outside screen,
 
-	use enteties for abilities?
-	create a transform struct instead of every object having a pos, rot, size, ect
+	use enteties for abilities?,
+	create a transform struct instead of every object having a pos, rot, size, ect,
 	
-	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity.
-		-this also means that if we switch item the projectiles will keep being rendered but not updated.
-		-Fix
+	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity,
+		-this also means that if we switch item the projectiles will keep being rendered but not updated,
+		-Fix,
 */
 
 
@@ -98,11 +100,19 @@ Asympatic_object :: struct{
 }
 
 // the vertex data
-Vertex_Data :: struct{
+Vertex_data :: struct{
 	pos: Vec3,
 	col: sg.Color,
 	uv: Vec2,
 	tex_index: u8,
+}
+
+Vertex_buffer_data :: struct{
+	uv_data: Vec4,
+	size_data: Vec2,
+	color_data: sg.Color,
+	tex_index_data: u8,
+	buffer: sg.Buffer,
 }
 
 Object_group :: struct{
@@ -159,9 +169,12 @@ Globals :: struct {
 	player: Player,
 	cursor: Cursor,
 
+	//used to avoid initing multiple of the same buffer
+	vertex_buffers: [dynamic]Vertex_buffer_data,
+	//used to avoid initing mutiple of the same img
 	images: [dynamic]Images,
 
-	fonts: [dynamic]FONT_INFO,
+	fonts: map[string]FONT_INFO,
 	enteties: Enteties,
 }
 g: ^Globals
@@ -286,8 +299,8 @@ cleanup_cb :: proc "c" (){
 	context = default_context
 
 	// DESTROY!!!
-	for id in g.objects{
-		sg.destroy_buffer(g.objects[id].vertex_buffer)
+	for buffer in g.vertex_buffers{
+		sg.destroy_buffer(buffer.buffer)
 	}
 
 	for image in g.images{
@@ -301,6 +314,7 @@ cleanup_cb :: proc "c" (){
 
 	//free the global vars
 	free(g)
+	free(game_state)
 	free_all()
 
 
@@ -615,19 +629,46 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 
 //buffer util
 
+
 // checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
-	vertices := []Vertex_Data {
+	vertices := []Vertex_data {
 		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index	},
 		{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index	},
 		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index	},
 		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index	},
 	}
+	buffer: sg.Buffer
 	
-	buffer := sg.make_buffer({ data = sg_range(vertices)})
+	buffer_exists: bool = false
+	for vertex_buffer in g.vertex_buffers{
+		same_buffer_data := true
+		if vertex_buffer.uv_data != uvs do same_buffer_data = false
+		if vertex_buffer.size_data != size do same_buffer_data = false
+		if vertex_buffer.color_data != color_offset do same_buffer_data = false
+		if vertex_buffer.tex_index_data != tex_index do same_buffer_data = false
+
+		
+		if same_buffer_data{
+			buffer_exists = true
+			buffer = vertex_buffer.buffer
+			break
+		}
+	}
+	if !buffer_exists{
+		buffer = sg.make_buffer({ data = sg_range(vertices)})
+		append(&g.vertex_buffers, Vertex_buffer_data{
+			buffer = buffer,
+			uv_data = uvs,
+			size_data = size,
+			color_data = color_offset,
+			tex_index_data = tex_index,
+		})
+	}
 
 	return buffer
 }
+
 
 //key press utils
 
@@ -681,6 +722,8 @@ xform_scale :: proc(scale: Vec2) -> Matrix4 {
 //removing objects
 
 remove_object ::	proc(id: string){
+	assert(id in g.objects)
+
 	delete_key(&g.objects, id)
 }
 
@@ -799,7 +842,7 @@ init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, siz
 
 	same_buffer: bool = true
 
-	if id in g.objects{
+	if id in g.objects == false{
 		vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, tex_index)
 		g.objects[id] = Object_group{
 			vertex_buffer = vertex_buffer,
@@ -1002,18 +1045,16 @@ char_count :: 96
 init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text) {
 	using stbtt
 
+	assert(font_id in g.fonts)
+
 	rotation : Vec3 = {0, 0, text_rot}
 
 	atlas_image : sg.Image
 	font_data : [char_count]stbtt.bakedchar
 
-	for font in g.fonts {
-		if font_id == font.id {
-			atlas_image = font.img
-			font_data = font.char_data
-		}
-	}
-
+	atlas_image = g.fonts[font_id].img
+	font_data = g.fonts[font_id].char_data
+	
 	assert(atlas_image.id != 0, "failed to get font")
 	using stbtt
 
@@ -1139,13 +1180,15 @@ init_font :: proc(font_path: string, font_h: i32 = 16, id: string) {
 
 //stores font data in g.fonts
 store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count]stbtt.bakedchar, font_id: string){
-	append(&g.fonts, FONT_INFO{
+	assert(font_id in g.fonts == false)
+
+	g.fonts[font_id] = FONT_INFO{
 		id = font_id,
 		img = sg_img,
 		width = w,
 		height = h,
 		char_data = font_char_data
-	})
+	}
 }
 
 //generate the Char_object
