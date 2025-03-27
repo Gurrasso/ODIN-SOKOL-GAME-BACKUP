@@ -4,7 +4,7 @@ package main
 /*
 	TODO: 
 	
-	use hashmaps for the fonts, 
+		-use hashmaps for the fonts, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working,
@@ -162,7 +162,7 @@ Globals :: struct {
 	index_buffer: sg.Buffer,	
 	sampler: sg.Sampler,
 	//Objects for drawing
-	text_objects: [dynamic]Text_object,
+	text_objects: map[string]Text_object,
 	objects: map[string]Object_group,
 	//Things there are only one of
 	camera: Camera,
@@ -344,24 +344,22 @@ frame_cb :: proc "c" (){
 	//	projection matrix(turns normal coords to screen coords)
 	p := linalg.matrix4_perspective_f32(70, sapp.widthf() / sapp.heightf(), 0.0001, 1000)
 	//view matrix
-	v := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {0, 1, 0})
+	v := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {g.camera.rotation, 1, 0})
 
 	sg.begin_pass({ swapchain = shelpers.glue_swapchain()})
 
 	//apply the pipeline to the sokol graphics
 	sg.apply_pipeline(g.pipeline)
 
-	camera_zrotation := g.camera.rotation
-
 	draw_data: [dynamic]Draw_data
 
 	//do things for all text objects
-	for text_object in g.text_objects {
-		for obj in text_object.objects{
+	for id in g.text_objects {
+		for obj in g.text_objects[id].objects{
 			//matrix
 
 			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
-			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
+			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
 	
 	
 			//apply the bindings(something that says which things we want to draw)
@@ -375,7 +373,7 @@ frame_cb :: proc "c" (){
 			append(&draw_data, Draw_data{
 				m = m,
 				b = b,
-				draw_priority = text_object.draw_priority,
+				draw_priority = g.text_objects[id].draw_priority,
 			})
 		}
 	}
@@ -384,7 +382,7 @@ frame_cb :: proc "c" (){
 	for id in g.objects {
 		for obj in g.objects[id].objects{
 		//matrix
-			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z) + camera_zrotation)
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
 	
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
@@ -728,12 +726,9 @@ remove_object ::	proc(id: string){
 }
 
 remove_text_object :: proc(id: string) {
-	for i := 0; i < len(g.text_objects); i += 1 {
-		if g.text_objects[i].id == id{
-			ordered_remove(&g.text_objects, i)
-			i-=1
-		}
-	}
+	assert(id in g.text_objects)
+
+	delete_key(&g.text_objects, id)
 }
 
 //rotation of objects around center point
@@ -866,7 +861,7 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
 
 
 	//color offset
@@ -887,7 +882,7 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 
 	append(&object_group.objects, Object{
 		{pos.x, pos.y, 0},
-		{0, 0, 0},
+		rot3,
 		img,
 		draw_priority,
 	})
@@ -895,8 +890,8 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
-	init_sprite_from_img(get_image(filename), pos, size, id, tex_index, draw_priority)	
+init_sprite_from_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
+	init_sprite_from_img(get_image(filename), pos, size, id, tex_index, draw_priority, rot3)	
 }
 
 //involves some code duplication
@@ -1047,6 +1042,8 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 
 	assert(font_id in g.fonts)
 
+	assert(text_object_id in g.text_objects == false)
+
 	rotation : Vec3 = {0, 0, text_rot}
 
 	atlas_image : sg.Image
@@ -1136,13 +1133,13 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 	}
 
 	//add the text objects to the text objects
-	append(&g.text_objects, Text_object{
+	g.text_objects[text_object_id] = Text_object{
 		text_objects,
 		text_center,
 		text_rot,
 		text_object_id,
 		draw_priority,
-	})
+	}
 
 	//show the center point of the text
 	//init_rect(sg_color(Vec3{255, 255, 255}), text_center, {0.05, 0.05}, "center")
@@ -1225,35 +1222,32 @@ update_text_object :: proc(pos: Vec2, rot: f32, id: string){
 }
 
 update_text_rot :: proc(rot: f32, id: string){
+	assert(id in g.text_objects)
+
+	text_object := &g.text_objects[id]
 
 	rotation := Vec3{0, 0, rot}
 
-	for &text_object in g.text_objects{
-		if text_object.id == id{
+	text_object.rot = rotation
 
-			text_object.rot = rotation
+	for &obj in text_object.objects{
 
-			for &obj in text_object.objects{
-
-				obj.rot = rotation
-				obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_object.pos, obj.rot.z)
-			}
-		}
+		obj.rot = rotation
+		obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_object.pos, obj.rot.z)
 	}
 }
 
 update_text_pos :: proc(pos: Vec2, id: string){
+	assert(id in g.text_objects)
 
-	for &text_object in g.text_objects{
-		if text_object.id == id{
-			motion := pos - text_object.pos
-			text_object.pos = pos
-			for &obj in text_object.objects{
-				obj.pos += Vec3{motion.x, motion.y, 0}
-			}
-		}
+	text_object := &g.text_objects[id]
+
+
+	motion := pos - text_object.pos
+	text_object.pos = pos
+	for &obj in text_object.objects{
+		obj.pos += Vec3{motion.x, motion.y, 0}
 	}
-
 }
 
 
@@ -1416,7 +1410,7 @@ init_projectile :: proc(projectile_data: Projectile, shoot_pos: Vec2, dir: Vec2,
 	projectile.rot = linalg.atan2(projectile.dir.y, projectile.dir.x)
 	projectile.sprite_id = sprite_id
 	
-	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id)
+	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id, rot3 = projectile.rot)
 }
 
 remove_projectile :: proc(projectile: ^Projectile){
@@ -2198,8 +2192,8 @@ init_camera_shake :: proc(){
 		depletion = 8,
 		pos_offset = { 0,0 },
 		rot_offset = 0,
-		seed = 27193,
-		time_offset = {7.5, 7.5}
+		seed = 223492,
+		time_offset = {5.5, 5.5}
 	}
 }
 
