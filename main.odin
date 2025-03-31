@@ -1578,7 +1578,7 @@ init_game_state :: proc(){
 
 update_game_state :: proc(){
 	event_listener()
-	
+
 	update_projectiles(&game_state.projectiles)
 	// move_camera_3D(dt)
 	update_player()
@@ -2090,6 +2090,7 @@ Camera_zoom :: struct{
 	threshold: f32,
 	default: f32,
 	speed: f32,
+	enabled: bool,
 }
 
 LOOK_SENSITIVITY :: 0.3
@@ -2103,9 +2104,10 @@ init_camera :: proc(){
 		target = { 0,0,-1 },
 		//how much to zoom out, when to max out and how fast to zoom
 		zoom = {
-			max = 0,
-			threshold = 0.2,
-			speed = 1,
+			max = 12,
+			threshold = 0.0002,
+			speed = 5,
+			enabled = false,
 		},
 
 		//spring forces has to be in order
@@ -2181,10 +2183,10 @@ camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = 
 			threshold_diff := next_sf.threshold - sf.threshold
 
 			//how much of the threshold value we are at
-			gradient_index := threshold_player_diff/threshold_diff
+			value_index := threshold_player_diff/threshold_diff
 
 			//adds a percentage of the next spring force dependent on our movement speed
-			g.camera.asym_obj.depletion = sf.depletion + math.lerp(sf.threshold, next_sf.threshold, gradient_index) 
+			g.camera.asym_obj.depletion = sf.depletion + math.lerp(sf.threshold, next_sf.threshold, value_index) 
 		//if we are in the last element of the aray. Means we are at the max values
 		} else {
 			g.camera.asym_obj.depletion = sf.depletion
@@ -2192,21 +2194,23 @@ camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = 
 	}
 
 	//change how much the camera is zoomed out ( depentent on movement speed )
+	// only need to update if we actually have any zoom and if it's enabled
+	if g.camera.zoom.default != g.camera.zoom.max && g.camera.zoom.enabled{
+		zoom_value_index := (move_mag/g.camera.zoom.threshold)
+		zoom_value_index = math.clamp(zoom_value_index, 0, 1)
 
-	zoom_threshold_diff := move_mag - g.camera.zoom.threshold
-	zoom_gradient_index := (zoom_threshold_diff/g.camera.zoom.threshold) + 1
-	if zoom_gradient_index > 1 do zoom_gradient_index = 1
+		//desired zoom position
+		zoom_zpos := math.lerp(g.camera.zoom.default, g.camera.zoom.max, zoom_value_index)
 
-	//desired zoom position
-	zoom_zpos := g.camera.zoom.default + (g.camera.zoom.max * zoom_gradient_index)
-
-	//slowly moves the z pos of camera to the desired zoom position
-	if zoom_zpos > g.camera.position.z{
-		g.camera.position.z += g.camera.zoom.speed * g.dt
-	} else if zoom_zpos < g.camera.position.z{
-		g.camera.position.z -= g.camera.zoom.speed * g.dt
+		//slowly moves the z pos of camera to the desired zoom position
+		if zoom_zpos > g.camera.position.z{
+			g.camera.position.z += g.camera.zoom.speed * g.dt
+		} else if zoom_zpos < g.camera.position.z{
+			g.camera.position.z -= g.camera.zoom.speed * g.dt
+		}
 	}
 
+	
 	//update the spring physics and update the camera position
 	update_asympatic_averaging(&g.camera.asym_obj)
 	update_asympatic_averaging(&g.camera.lookahead_asym_obj)
