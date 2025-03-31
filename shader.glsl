@@ -48,9 +48,9 @@ void main() {
 
   vec4 tex_col = vec4(1.0);
   if (tex_index == 0) {
-        tex_col = texture(sampler2D(tex, smp), texcoord); 
+    tex_col = texture(sampler2D(tex, smp), texcoord); 
   } else if (tex_index == 1) {
-        // this is text, it's only got the single .r channel so we stuff it into the alpha
+    // this is text, it's only got the single .r channel so we stuff it into the alpha
     tex_col.a = texture(sampler2D(tex, smp), texcoord).r;
   }
 

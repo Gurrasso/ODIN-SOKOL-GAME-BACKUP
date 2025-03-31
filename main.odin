@@ -4,16 +4,17 @@ package main
 /*
 	TODO: 
 	
-		-use hashmaps for the fonts, 
+		-use a map for the fonts, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working,
 
 	add updating of vertex_buffers,
 
-	fix projectiles having wrong roation on init,
+		-fix projectiles having wrong roation on init,
+	add weapon shoot delay,
 
-	use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array,
+		-use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array,
 		-optimize use of repeted vertex buffers, images and other stuff,
 	automatically give sprite ids instead of having to assign them manually,
 
@@ -30,10 +31,10 @@ package main
 		-camera shake,
 		-replace wierd springs with asympatic averaging,
 	
-	player movement acceleration and deceleration,
+		-player movement acceleration and deceleration,
 	collisions,
 	
-	custom cursor,
+		-custom cursor,
 		-make it so cursor cant go outside screen,
 
 	use enteties for abilities?,
@@ -43,7 +44,6 @@ package main
 		-this also means that if we switch item the projectiles will keep being rendered but not updated,
 		-Fix,
 */
-
 
 // 
 //	IMPORTS
@@ -503,6 +503,9 @@ mouse_move: Vec2
 key_down: #sparse[sapp.Keycode]bool
 single_key_up: #sparse[sapp.Keycode]bool
 single_key_down: #sparse[sapp.Keycode]bool
+mouse_down: #sparse[sapp.Mousebutton]bool
+single_mouse_down: #sparse[sapp.Mousebutton]bool
+single_mouse_up: #sparse[sapp.Mousebutton]bool
 
 //Events
 event_cb :: proc "c" (ev: ^sapp.Event){
@@ -513,7 +516,7 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 			mouse_move += {ev.mouse_dx, ev.mouse_dy}
 		case .KEY_DOWN:
 
-			if key_down[ev.key_code] == false && single_key_down[ev.key_code] == false{
+			if !key_down[ev.key_code] && !single_key_down[ev.key_code]{
 				single_key_down[ev.key_code] = true
 			}
 
@@ -521,13 +524,32 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 
 			single_key_up[ev.key_code] = false
 		case .KEY_UP:
-			if !key_down[ev.key_code] == false && single_key_up[ev.key_code] == false{
+			if key_down[ev.key_code] && !single_key_up[ev.key_code]{
 				single_key_up[ev.key_code] = true
 			}
 
 			key_down[ev.key_code] = false
 
 			single_key_down[ev.key_code] = false
+		case .MOUSE_DOWN:
+
+			if  !mouse_down[ev.mouse_button] && !single_mouse_down[ev.mouse_button]{
+				single_mouse_down[ev.mouse_button] = true
+			}
+
+			mouse_down[ev.mouse_button] = true
+
+			single_mouse_up[ev.mouse_button] = false	
+		case .MOUSE_UP:
+			if mouse_down[ev.mouse_button] && !single_mouse_up[ev.mouse_button]{
+				single_mouse_up[ev.mouse_button] = true
+			}
+
+			mouse_down[ev.mouse_button] = false
+
+			single_mouse_down[ev.mouse_button] = false
+
+
 	}
 }
 
@@ -698,7 +720,45 @@ listen_key_down :: proc(keycode: sapp.Keycode) -> bool{
 }
 
 listen_key_up :: proc(keycode: sapp.Keycode) -> bool{
-	if key_down[keycode] == false {
+	if !key_down[keycode] {
+		return true	
+	} else{
+		return false
+	}
+}
+
+
+//mouse press utils
+
+listen_mouse_single_up :: proc(Mousebutton: sapp.Mousebutton) -> bool{
+	if single_mouse_up[Mousebutton] {
+		single_mouse_up[Mousebutton] = false
+		return true	
+	} else{
+		return false
+	}
+}
+
+listen_mouse_single_down :: proc(Mousebutton: sapp.Mousebutton) -> bool{
+	if single_mouse_down[Mousebutton] {
+		single_mouse_down[Mousebutton] = false
+		return true	
+	} else{
+		return false
+	}
+
+}
+
+listen_mouse_down :: proc(Mousebutton: sapp.Mousebutton) -> bool{
+	if mouse_down[Mousebutton] {
+		return true	
+	} else{
+		return false
+	}
+}
+
+listen_mouse_up :: proc(Mousebutton: sapp.Mousebutton) -> bool{
+	if !mouse_down[Mousebutton] {
 		return true	
 	} else{
 		return false
@@ -1317,11 +1377,10 @@ update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: stri
 //projectile weapon
 Projectile_weapon :: struct{
 	//shoot button
-	trigger: sapp.Keycode,
-	damage: f32,
+	trigger: sapp.Mousebutton,
 	//a radian value that uses the add_randomness_vec2 function to add some randomness to the projectile directions
 	random_spread: f32,
-	//how far apart shots will be
+	//how far apart shots will be also in radians
 	spread: f32,
 	//number of shots the weapon fires
 	shots: int,
@@ -1329,6 +1388,8 @@ Projectile_weapon :: struct{
 	camera_shake: f32,
 	//the default values of the projectiles
 	projectile: Projectile,
+	
+	automatic: bool,
 }
 
 //init function that runs on item_holder init
@@ -1343,7 +1404,12 @@ reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
 //update function runs that runs every frame inside of item holder ( only if the item is equiped ofc )
 update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, shoot_pos: Vec2){
 	//add a projectile to the array if you press the right trigger
-	if listen_key_single_down(weapon.trigger){
+	should_shoot: bool
+	
+	if !weapon.automatic do should_shoot = listen_mouse_single_down(weapon.trigger)
+	else do should_shoot = listen_mouse_down(weapon.trigger)
+
+	if should_shoot{
 		for i := 0; i < weapon.shots; i += 1{
 			
 						
@@ -1372,6 +1438,7 @@ Projectile :: struct{
 	size: Vec2,
 	lifetime: f32,
 	speed: f32,
+	damage: f32,
 	
 	pos: Vec2,
 	rot: f32,
@@ -1550,7 +1617,7 @@ event_listener :: proc(){
 
 	if listen_key_single_down(.F){
 		if tempiteminc %% 2 == 0{
-			give_item(&g.player.holder, "arvid")
+			give_item(&g.player.holder, "otto")
 			tempiteminc += 1
 		}else{
 			give_item(&g.player.holder, "gun")
@@ -1847,16 +1914,16 @@ init_weapons :: proc(){
 
 	// GUUN
 	gun_weapon_data := Projectile_weapon{
-		trigger = .X,
-		damage = 10,
+		trigger = .LEFT,
 		random_spread = 0.05,
 		shots = 1,
-		camera_shake = 1.3,
+		camera_shake = 1.5,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
 			size = {0.15, 0.15},
 			lifetime = 2,
 			speed = 25,
+			damage = 0,
 		},
 	}
 	gun_item_data := Item_data{
@@ -1869,17 +1936,17 @@ init_weapons :: proc(){
 	entity_add_component("gun", gun_weapon_data)
 
 	arvid_weapon_data := Projectile_weapon{
-		trigger = .X,
-		damage = 2,
-		random_spread = 0,
-		shots = 20,
-		spread = 0.1,
-		camera_shake = 1.3,
+		trigger = .LEFT,
+		random_spread = 0.3,
+		shots = 5,
+		spread = 0.12,
+		camera_shake = 1.6,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
-			size = {0.1, 0.1},
+			size = {0.2, 0.2},
 			lifetime = 2,
-			speed = 25,
+			speed = 20,
+			damage = 0,
 		},
 	}
 	arvid_item_data := Item_data{
@@ -1889,6 +1956,31 @@ init_weapons :: proc(){
 	create_entity("arvid", {.Item, .Projectile_weapon})	
 	entity_add_component("arvid", arvid_item_data)
 	entity_add_component("arvid", arvid_weapon_data)
+
+	otto_weapon_data := Projectile_weapon{
+		trigger = .LEFT,
+		random_spread = 0.2,
+		shots = 1,
+		spread = 0,
+		camera_shake = 1.1,
+		automatic = true,
+		projectile = Projectile{
+			img = get_image(WHITE_IMAGE_PATH),
+			size = {0.1, 0.1},
+			lifetime = 2,
+			speed = 18,
+			damage = 0,
+		},
+	}
+	otto_item_data := Item_data{
+		img = get_image(WHITE_IMAGE_PATH),
+		size = {2, 0.2}
+	}
+	create_entity("otto", {.Item, .Projectile_weapon})	
+	entity_add_component("otto", otto_item_data)
+	entity_add_component("otto", otto_weapon_data)
+
+
 
 }
 
@@ -1928,7 +2020,7 @@ init_cursor :: proc(){
 update_cursor :: proc(){
 	g.cursor.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * g.dt)
 	check_cursor_collision()
-	update_sprite(pos = Vec2{g.camera.position.x ,g.camera.position.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
+	update_sprite(pos = Vec2{g.camera.position.x - g.camera.camera_shake.pos_offset.x, g.camera.position.y - g.camera.camera_shake.pos_offset.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
 }
 
 //check the cursor collision with the screen
@@ -2091,11 +2183,8 @@ camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = 
 			//how much of the threshold value we are at
 			gradient_index := threshold_player_diff/threshold_diff
 
-			//difference between the forces
-			force_diff := next_sf.depletion - sf.depletion
-
 			//adds a percentage of the next spring force dependent on our movement speed
-			g.camera.asym_obj.depletion = sf.depletion + (force_diff * gradient_index)
+			g.camera.asym_obj.depletion = sf.depletion + math.lerp(sf.threshold, next_sf.threshold, gradient_index) 
 		//if we are in the last element of the aray. Means we are at the max values
 		} else {
 			g.camera.asym_obj.depletion = sf.depletion
@@ -2193,7 +2282,7 @@ init_camera_shake :: proc(){
 		pos_offset = { 0,0 },
 		rot_offset = 0,
 		seed = 223492,
-		time_offset = {5.5, 5.5}
+		time_offset = {5, 5}
 	}
 }
 
@@ -2210,7 +2299,7 @@ update_camera_shake :: proc(){
 		cs.pos_offset /= 30
 		cs.pos_offset *= cs.trauma * cs.trauma
 		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
-		cs.rot_offset /= 20
+		cs.rot_offset /= 30
 		cs.rot_offset *= cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * g.dt
