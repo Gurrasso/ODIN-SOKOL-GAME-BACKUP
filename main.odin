@@ -117,7 +117,6 @@ Vertex_buffer_data :: struct{
 
 Object_group :: struct{
 	objects: [dynamic]Object,
-	vertex_buffer: sg.Buffer,
 }
 
 
@@ -132,6 +131,7 @@ Object :: struct{
 	rot: Vec3,
 	img: sg.Image,
 	draw_priority: i32,
+	vertex_buffer: sg.Buffer,
 }
 
 Spring :: struct{
@@ -386,7 +386,7 @@ frame_cb :: proc "c" (){
 	
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
-				vertex_buffers = { 0 = g.objects[id].vertex_buffer },
+				vertex_buffers = { 0 = obj.vertex_buffer },
 				index_buffer = g.index_buffer,
 				images = { IMG_tex = obj.img },
 				samplers = { SMP_smp = g.sampler },
@@ -891,27 +891,9 @@ WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
 
-	DEFAULT_UV :: Vec4 { 0,0,1,1 }
-
-	same_buffer: bool = true
-
-	if id in g.objects == false{
-		vertex_buffer := get_vertex_buffer(size, color_offset, DEFAULT_UV, tex_index)
-		g.objects[id] = Object_group{
-			vertex_buffer = vertex_buffer,
-		}
-	}
-
-	object_group := &g.objects[id]
-
-	append(&object_group.objects, Object{
-		{pos.x, pos.y, 0},
-		{0, 0, 0},
-		WHITE_IMAGE,
-		draw_priority,
-	})	
+	init_sprite_from_img(WHITE_IMAGE, pos, size, id, tex_index, draw_priority, rot3)	
 
 }
 
@@ -929,13 +911,10 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	same_buffer: bool = true
-
+	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
+	
 	if id in g.objects == false{
-		vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
-		g.objects[id] = Object_group{
-			vertex_buffer = vertex_buffer,
-		}
+		g.objects[id] = Object_group{}
 	}
 
 	object_group := &g.objects[id]
@@ -945,6 +924,7 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 		rot3,
 		img,
 		draw_priority,
+		vertex_buffer,
 	})
 }
 
@@ -972,6 +952,7 @@ update_sprite_pos_rot_image :: proc(img: sg.Image, pos: Vec2, rot3: Vec3 = { 0,0
 			rot3,
 			img,
 			object.draw_priority,
+			object.vertex_buffer,
 		}
 	}
 }
@@ -986,6 +967,7 @@ update_sprite_pos_rot :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: string){
 			rot3,
 			object.img,
 			object.draw_priority,
+			object.vertex_buffer,
 		}
 	}
 }
@@ -1001,6 +983,7 @@ update_sprite_pos :: proc(pos: Vec2, id: string){
 			object.rot,
 			object.img,
 			object.draw_priority,
+			object.vertex_buffer,
 		}
 	}
 }
@@ -1014,6 +997,7 @@ update_sprite_rot :: proc(rot3: Vec3 = { 0,0,0 }, id: string){
 			rot3,
 			object.img,
 			object.draw_priority,
+			object.vertex_buffer,
 		}
 	}
 }
@@ -1027,6 +1011,7 @@ update_sprite_image :: proc(img: sg.Image, id: string){
 			object.rot,
 			img,
 			object.draw_priority,
+			object.vertex_buffer,
 		}
 	}
 }
@@ -1571,7 +1556,7 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST \n", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 	
 	init_cursor()
 }
@@ -1580,7 +1565,7 @@ update_game_state :: proc(){
 	event_listener()
 
 	update_projectiles(&game_state.projectiles)
-	// move_camera_3D(dt)
+	//move_camera_3D()
 	update_player()
 
 	update_camera()
