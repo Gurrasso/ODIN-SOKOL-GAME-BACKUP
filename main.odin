@@ -3,7 +3,9 @@ package main
 
 /*
 	TODO: 
-	
+		
+	generate an image atlas on init with all the images instead of loading induvidual images?
+
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working,
