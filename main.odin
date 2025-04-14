@@ -4,22 +4,23 @@ package main
 /*
 	TODO: 
 	
-		-use a map for the fonts, 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working,
 
 	add updating of vertex_buffers,
 
-		-fix projectiles having wrong roation on init,
 	add weapon shoot delay,
+	timer obj,
+	
+	make sure everything that should use the transform struct uses it,
+	make sure we use the same naming for pos, rot ect everywhere,
 
-		-use a map with an array of objects for the objects and text objects so that you can group them instead of having to loop through each element in an array,
-		-optimize use of repeted vertex buffers, images and other stuff,
 	automatically give sprite ids instead of having to assign them manually,
 
 	sprite sheet rendering,
 	animation system thing?,
+	collisions,
 	
 	tilemap and other environment/map things,
 	
@@ -28,26 +29,12 @@ package main
 	resolution scaling?,
 	fix init_icon,
 	
-		-camera shake,
-		-replace wierd springs with asympatic averaging,
-	
-		-player movement acceleration and deceleration,
-	collisions,
-	
-		-custom cursor,
-		-make it so cursor cant go outside screen,
-
 	use enteties for abilities?,
-	create a transform struct instead of every object having a pos, rot, size, ect,
-	
-	Projectile weapons are currently only usabe by one item holder at a time, this is because the projectiles that it shoots store its data inside the entity,
-		-this also means that if we switch item the projectiles will keep being rendered but not updated,
-		-Fix,
 */
 
-// 
-//	IMPORTS
-//
+// ===============
+//	  :IMPORTS
+// ===============
 import "base:intrinsics"
 import "base:runtime"
 import "core:log"
@@ -73,6 +60,7 @@ import sglue "../sokol/glue"
 import ecs "./lib/odin-ecs"
 
 to_radians :: linalg.to_radians
+to_degrees :: linalg.to_degrees
 Matrix4 :: linalg.Matrix4f32;
 
 //global var for context
@@ -134,6 +122,16 @@ Object :: struct{
 	vertex_buffer: sg.Buffer,
 }
 
+Transform :: struct{
+	pos: Vec2,
+	rot: Vec3,
+	size: Vec2,
+}
+
+DEFAULT_TRANSFORM: Transform = {
+	size = {0.5, 0.5}
+}
+
 Spring :: struct{
 	//where the spring is attached
 	anchor: Vec2,
@@ -182,9 +180,9 @@ g: ^Globals
 
 ctx: ecs.Context
 
-// 
-// MAIN!!!!!
-// 
+// ============== 
+//     :MAIN
+// ==============
 
 main :: proc(){
 	//logger
@@ -213,9 +211,9 @@ main :: proc(){
 	
 }
 
-//
-// SOKOL PROCS
-//
+// =================
+//   :SOKOL PROCS
+// =================
 
 //initialization
 init_cb :: proc "c" (){
@@ -336,9 +334,9 @@ frame_cb :: proc "c" (){
 	g.dt = f32(sapp.frame_duration())
 	//updates
 	update_game_state()
-
+	
 	//
-	// RENDERING
+	// rendering	
 	//
 
 	//	projection matrix(turns normal coords to screen coords)
@@ -420,9 +418,55 @@ frame_cb :: proc "c" (){
 	sg.commit()
 }
 
-//
-// IMAGE THINGS
-//
+//Events
+event_cb :: proc "c" (ev: ^sapp.Event){
+	context = default_context
+
+	#partial switch ev.type{
+		case .MOUSE_MOVE:
+			mouse_move += {ev.mouse_dx, ev.mouse_dy}
+		case .KEY_DOWN:
+
+			if !key_down[ev.key_code] && !single_key_down[ev.key_code]{
+				single_key_down[ev.key_code] = true
+			}
+
+			key_down[ev.key_code] = true
+
+			single_key_up[ev.key_code] = false
+		case .KEY_UP:
+			if key_down[ev.key_code] && !single_key_up[ev.key_code]{
+				single_key_up[ev.key_code] = true
+			}
+
+			key_down[ev.key_code] = false
+
+			single_key_down[ev.key_code] = false
+		case .MOUSE_DOWN:
+
+			if  !mouse_down[ev.mouse_button] && !single_mouse_down[ev.mouse_button]{
+				single_mouse_down[ev.mouse_button] = true
+			}
+
+			mouse_down[ev.mouse_button] = true
+
+			single_mouse_up[ev.mouse_button] = false	
+		case .MOUSE_UP:
+			if mouse_down[ev.mouse_button] && !single_mouse_up[ev.mouse_button]{
+				single_mouse_up[ev.mouse_button] = true
+			}
+
+			mouse_down[ev.mouse_button] = false
+
+			single_mouse_down[ev.mouse_button] = false
+
+
+	}
+}
+
+// ==================
+//   :IMAGE THINGS
+// ==================
 
 
 //	proc for loading an image from a file
@@ -507,55 +551,11 @@ mouse_down: #sparse[sapp.Mousebutton]bool
 single_mouse_down: #sparse[sapp.Mousebutton]bool
 single_mouse_up: #sparse[sapp.Mousebutton]bool
 
-//Events
-event_cb :: proc "c" (ev: ^sapp.Event){
-	context = default_context
-
-	#partial switch ev.type{
-		case .MOUSE_MOVE:
-			mouse_move += {ev.mouse_dx, ev.mouse_dy}
-		case .KEY_DOWN:
-
-			if !key_down[ev.key_code] && !single_key_down[ev.key_code]{
-				single_key_down[ev.key_code] = true
-			}
-
-			key_down[ev.key_code] = true
-
-			single_key_up[ev.key_code] = false
-		case .KEY_UP:
-			if key_down[ev.key_code] && !single_key_up[ev.key_code]{
-				single_key_up[ev.key_code] = true
-			}
-
-			key_down[ev.key_code] = false
-
-			single_key_down[ev.key_code] = false
-		case .MOUSE_DOWN:
-
-			if  !mouse_down[ev.mouse_button] && !single_mouse_down[ev.mouse_button]{
-				single_mouse_down[ev.mouse_button] = true
-			}
-
-			mouse_down[ev.mouse_button] = true
-
-			single_mouse_up[ev.mouse_button] = false	
-		case .MOUSE_UP:
-			if mouse_down[ev.mouse_button] && !single_mouse_up[ev.mouse_button]{
-				single_mouse_up[ev.mouse_button] = true
-			}
-
-			mouse_down[ev.mouse_button] = false
-
-			single_mouse_down[ev.mouse_button] = false
 
 
-	}
-}
-
-//
-// UTILS
-//
+// =============
+//    :UTILS
+// =============
 
 //used to sort the draw data based on draw_priority
 compare_draw_data_draw_priority :: proc(drt: Draw_data, drt2: Draw_data) -> int{
@@ -874,6 +874,16 @@ update_asympatic_averaging :: proc(asym_obj: ^Asympatic_object){
 	asym_obj.position += force
 }
 
+asympatic_average_transform :: proc(transform: ^Transform, destination: Vec2, depletion: f32){
+	force := transform.pos - destination
+	x := get_vector_magnitude(force)
+	force = linalg.normalize0(force)
+	force *= -1 * x
+	force *= g.dt
+	force *= depletion
+	transform.pos += force
+}
+
 //init the icon
 init_icon :: proc(imagefile: cstring){
 	// ICON
@@ -883,17 +893,17 @@ init_icon :: proc(imagefile: cstring){
 	sapp.set_icon(icon_desc)
 }
 
-//
-// DRAWING
-//
+// =============
+//   :DRAWING
+// =============
 
 WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, pos: Vec2 = { 0,0 }, size: Vec2 = { 0.5,0.5 }, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
+init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
-	init_sprite_from_img(WHITE_IMAGE, pos, size, id, tex_index, draw_priority, rot3)	
+	init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority)	
 
 }
 
@@ -903,7 +913,7 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
 
 	//color offset
@@ -911,7 +921,7 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	vertex_buffer := get_vertex_buffer(size, WHITE, DEFAULT_UV, tex_index)
+	vertex_buffer := get_vertex_buffer(transform.size, WHITE, DEFAULT_UV, tex_index)
 	
 	if id in g.objects == false{
 		g.objects[id] = Object_group{}
@@ -920,8 +930,8 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 	object_group := &g.objects[id]
 
 	append(&object_group.objects, Object{
-		{pos.x, pos.y, 0},
-		rot3,
+		vec2_to_vec3(transform.pos),
+		transform.rot,
 		img,
 		draw_priority,
 		vertex_buffer,
@@ -930,72 +940,25 @@ init_sprite_from_img :: proc(img: sg.Image, pos: Vec2 = {0,0}, size: Vec2 = {0.5
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, pos: Vec2 = {0,0}, size: Vec2 = {0.5, 0.5}, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, rot3: Vec3 = {0, 0, 0}){
-	init_sprite_from_img(get_image(filename), pos, size, id, tex_index, draw_priority, rot3)	
+init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+	init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
 //involves some code duplication
 update_sprite :: proc{
-	update_sprite_pos_rot_image,
-	update_sprite_pos_rot,
-	update_sprite_pos,
-	update_sprite_rot,
+	update_sprite_transform,
+	update_sprite_transform_image,
 	update_sprite_image,
 }
 
-update_sprite_pos_rot_image :: proc(img: sg.Image, pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: string){
+update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: string){
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
 		object = Object{
-			vec2_to_vec3(pos),
-			rot3,
+			vec2_to_vec3(transform.pos),
+			transform.rot,
 			img,
-			object.draw_priority,
-			object.vertex_buffer,
-		}
-	}
-}
-
-update_sprite_pos_rot :: proc(pos: Vec2, rot3: Vec3 = { 0,0,0 }, id: string){
-
-	assert(id in g.objects)
-
-	for &object in g.objects[id].objects{
-		object = Object{
-			vec2_to_vec3(pos),
-			rot3,
-			object.img,
-			object.draw_priority,
-			object.vertex_buffer,
-		}
-	}
-}
-
-//proc for updating sprites
-update_sprite_pos :: proc(pos: Vec2, id: string){
-
-	assert(id in g.objects)
-
-	for &object in g.objects[id].objects{
-		object = Object{
-			vec2_to_vec3(pos),
-			object.rot,
-			object.img,
-			object.draw_priority,
-			object.vertex_buffer,
-		}
-	}
-}
-
-update_sprite_rot :: proc(rot3: Vec3 = { 0,0,0 }, id: string){
-	assert(id in g.objects)
-
-	for &object in g.objects[id].objects{
-		object = Object{
-			object.pos,
-			rot3,
-			object.img,
 			object.draw_priority,
 			object.vertex_buffer,
 		}
@@ -1010,6 +973,21 @@ update_sprite_image :: proc(img: sg.Image, id: string){
 			object.pos,
 			object.rot,
 			img,
+			object.draw_priority,
+			object.vertex_buffer,
+		}
+	}
+}
+
+update_sprite_transform :: proc(transform: Transform, id: string){
+
+	assert(id in g.objects)
+
+	for &object in g.objects[id].objects{
+		object = Object{
+			vec2_to_vec3(transform.pos),
+			transform.rot,
+			object.img,
 			object.draw_priority,
 			object.vertex_buffer,
 		}
@@ -1049,9 +1027,9 @@ tex_indices := Tex_indices{
 	text = 1,
 }
 
-//
-// FONT			 (	 a bit scuffed rn, gonna fix later(probably not)	 )
-//
+// ==========
+//   :FONT			 (	 a bit scuffed rn, gonna fix later(probably not)	 )
+// ==========
 
 Char_object :: struct{
 	pos: Vec3,
@@ -1176,7 +1154,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 			obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_center, obj.rot.z)
 		}
 	}
-
+	log.debug(text_center)
 	//add the text objects to the text objects
 	g.text_objects[text_object_id] = Text_object{
 		text_objects,
@@ -1295,8 +1273,9 @@ update_text_pos :: proc(pos: Vec2, id: string){
 	}
 }
 
-
-// ENTETIES
+// ================
+//    :ENTETIES
+// ================
 /*
 	Enteties uses the odin-ecs lib and is mainly meant for items and other stuff that can't be type specific
 	( I need to be able to give any item to my player regardless of what type it is or what data it has )
@@ -1351,12 +1330,13 @@ Item_data :: struct{
 	size: Vec2,
 }
 
-init_item :: proc(item_data: Item_data, pos: Vec2, sprite_id: string){
-	init_sprite(item_data.img, pos, item_data.size, sprite_id, draw_priority = draw_layers.item)
+init_item :: proc(transform: ^Transform, item_data: Item_data, sprite_id: string){
+	transform.size = item_data.size
+	init_sprite(item_data.img, transform^, sprite_id, draw_priority = draw_layers.item)
 }
 
-update_item :: proc(item_data: Item_data, pos: Vec2, rot3: Vec3, sprite_id: string){
-	update_sprite(img = item_data.img, pos = pos, rot3 = rot3, id = sprite_id)
+update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: string){
+	update_sprite(img = item_data.img, transform = transform, id = sprite_id)
 }
 
 //projectile weapon
@@ -1420,13 +1400,11 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 //projectile
 Projectile :: struct{
 	img: sg.Image,
-	size: Vec2,
 	lifetime: f32,
 	speed: f32,
 	damage: f32,
 	
-	pos: Vec2,
-	rot: f32,
+	transform: Transform,	
 	sprite_id: string,
 	duration: f32,
 	dir: Vec2,
@@ -1448,21 +1426,22 @@ update_projectiles :: proc(projectiles: ^[dynamic]Projectile){
 //update the projectile
 update_projectile :: proc(projectile: ^Projectile){
 	projectile.duration += g.dt
-	projectile.pos += projectile.dir * projectile.speed * g.dt
-	update_sprite(pos = projectile.pos, rot3 = Vec3{0, 0, linalg.to_degrees(projectile.rot)}, id = projectile.sprite_id)
+	projectile.transform.pos += projectile.dir * projectile.speed * g.dt
+	update_sprite(transform = projectile.transform, id = projectile.sprite_id)
 }
 
 //init a projectile
 init_projectile :: proc(projectile_data: Projectile, shoot_pos: Vec2, dir: Vec2, sprite_id: string){
 	append(&game_state.projectiles, projectile_data)
 	projectile := &game_state.projectiles[len(game_state.projectiles)-1]
+	transform := &projectile.transform
 
-	projectile.pos = shoot_pos
+	transform.pos = shoot_pos
 	projectile.dir = dir
-	projectile.rot = linalg.atan2(projectile.dir.y, projectile.dir.x)
+	transform.rot.z = linalg.to_degrees(linalg.atan2(projectile.dir.y, projectile.dir.x))
 	projectile.sprite_id = sprite_id
 	
-	init_sprite(img = projectile.img, pos = projectile.pos, size = projectile.size, id = projectile.sprite_id, rot3 = projectile.rot)
+	init_sprite(img = projectile.img, transform = transform^, id = projectile.sprite_id)
 }
 
 remove_projectile :: proc(projectile: ^Projectile){
@@ -1476,8 +1455,7 @@ remove_projectile :: proc(projectile: ^Projectile){
 
 //item holder is an obj that can display and update an entity with the item tag
 Item_holder :: struct{
-	pos: Vec2,
-	rot: Vec3,
+	transform: Transform,	
 	item: Entity,
 	sprite_id: string,
 	//if items like guns should be equipped
@@ -1498,7 +1476,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 	}
 
 	item_data := entity_get_component(entity = item.entity, component_type = Item_data)
-	init_item(item_data^, holder.pos, holder.sprite_id)
+	init_item(&holder.transform, item_data^, holder.sprite_id)
 }
 
 
@@ -1515,7 +1493,7 @@ update_item_holder :: proc(holder: Item_holder, look_dir: Vec2 = {0, 0}, shoot_p
 	}
 
 	item_data := entity_get_component(entity = item.entity, component_type = Item_data)
-	update_item(item_data^, holder.pos, holder.rot, holder.sprite_id)
+	update_item(holder.transform, item_data^, holder.sprite_id)
 }
 
 //gives an item to the item holder which potentially replaces the old one, the inits the holder
@@ -1528,9 +1506,9 @@ give_item :: proc(holder: ^Item_holder, item_id: string){
 
 
 
-//
-// GAME
-//
+// ==============
+//     :GAME
+// ==============
 
 //game specific globals
 Game_state :: struct{
@@ -1556,7 +1534,7 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST \n", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 	
 	init_cursor()
 }
@@ -1615,9 +1593,7 @@ event_listener :: proc(){
 Player :: struct{
 	id: string,
 	sprite_filename: cstring,
-	pos: Vec2,
-	size: Vec2,
-	rot: Vec3,
+	transform: Transform,	
 	xflip: f32,
 	xflip_threshold: f32,
 	
@@ -1646,8 +1622,9 @@ init_player :: proc(){
 		id = "Player",
 		sprite_filename = "./source/assets/textures/Random.png",
 		
-		pos = {0, 0},
-		size ={1, 1},
+		transform = {
+			size = {1, 1}
+		},
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
 		//how far over the player you have to go for it to flip
@@ -1660,8 +1637,6 @@ init_player :: proc(){
 		deceleration = 18,
 
 		holder = {
-			pos = {0, 0},
-			rot = {0, 0, 0},
 			item = g.enteties["gun"],
 			sprite_id = "playerholder",
 			equipped = true,
@@ -1674,7 +1649,7 @@ init_player :: proc(){
 	init_player_abilities()
 
 	//init the players sprite
-	init_sprite(g.player.sprite_filename, g.player.pos, g.player.size, g.player.id)
+	init_sprite(g.player.sprite_filename, g.player.transform, g.player.id)
 	//init the players item_holder
 	init_item_holder(&g.player.holder)
 }
@@ -1694,6 +1669,7 @@ player_deceleration_ease :: proc(x: f32) -> f32 {
 
 update_player :: proc() {
 	player := &g.player
+	transform := &player.transform
 
 	//changing the move_input with wasd
 	move_input: Vec2
@@ -1709,13 +1685,13 @@ update_player :: proc() {
 	motion : Vec2
 	
 	//for flipping the player sprite
-	if g.cursor.pos.x+g.camera.position.x <= player.pos.x+ player.xflip_threshold*player.xflip{
+	if g.cursor.transform.pos.x+g.camera.position.x <= transform.pos.x+ player.xflip_threshold*player.xflip{
 		player.xflip = 1
 	} else {
 		player.xflip = -1
 	}
 
-	player.rot.y = (player.xflip + 1) * 90
+	transform.rot.y = (player.xflip + 1) * 90
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
@@ -1747,35 +1723,39 @@ update_player :: proc() {
 	//update the item holder of the player
 	holder := &player.holder
 
+
 	//pos
 	holder_item_data := entity_get_component(entity = holder.item.entity, component_type = Item_data) 
 	holder_offset := (holder_item_data^.size.x/2) 
-	holder_rotation_pos := player.pos + ( player.item_offset.x * player.xflip)
-	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, player.pos.y}
+	holder_rotation_pos := transform.pos + ( player.item_offset.x * player.xflip)
+	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, transform.pos.y}
 
-	holder_rotation_vector := linalg.normalize0(g.cursor.pos-(player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
-	holder.pos = player.pos + (holder_rotation_vector*(holder_offset))
-	holder.pos.y += player.item_offset.y
-	holder.pos.x += new_holder_pos.x
+	holder_rotation_vector := linalg.normalize0(g.cursor.transform.pos-(transform.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	if holder_rotation_vector == {0, 0} do holder_rotation_vector = {1, 0}
+
+
+	holder.transform.pos = transform.pos + (holder_rotation_vector*(holder_offset))
+	holder.transform.pos.y += player.item_offset.y
+	holder.transform.pos.x += new_holder_pos.x
 
 	//rot
 
-	new_holder_rotation := linalg.to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
-	holder.rot.z = new_holder_rotation
-	holder.rot.y = player.rot.z 
+	new_holder_rotation := to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
+	holder.transform.rot.z = new_holder_rotation
+	holder.transform.rot.y = transform.rot.z
 
 
 	
 	//where the bullet should come from if it is a gun
 	shoot_pos_offset := holder_rotation_vector * holder_item_data.size.x/2
-	shoot_pos := player.holder.pos + shoot_pos_offset
+	shoot_pos := player.holder.transform.pos + shoot_pos_offset
 	update_item_holder(holder^, holder_rotation_vector, shoot_pos)
 
 	//creates a player rotation based of the movement
-	player.rot.z = linalg.to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
+	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
 
-	player.pos += motion
-	update_sprite(pos = player.pos, rot3 = player.rot, id = player.id)
+	transform.pos += motion
+	update_sprite(transform = transform^, id = player.id)
 }
 
 
@@ -1840,10 +1820,12 @@ update_player_dash :: proc(dash: ^Dash_data){
 	dash.duration +=dash.duration_speed * g.dt
 	dash.distance = dash_ease(dash.duration)
 
+	transform := &g.player.transform
+
 
 	// do the ability
 	dash_motion := linalg.normalize0(g.player.move_dir) * (dash.default_distance/dash.cutoff)
-	g.player.pos += dash_motion * (dash.distance-dash.last_distance)
+	transform.pos += dash_motion * (dash.distance-dash.last_distance)
 	g.player.move_speed = 0
 
 	dash.last_distance = dash.distance
@@ -1905,7 +1887,9 @@ init_weapons :: proc(){
 		camera_shake = 1.5,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
-			size = {0.15, 0.15},
+			transform = Transform{
+				size = {0.15, 0.15}
+			},
 			lifetime = 2,
 			speed = 25,
 			damage = 0,
@@ -1928,7 +1912,9 @@ init_weapons :: proc(){
 		camera_shake = 1.6,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
-			size = {0.2, 0.2},
+			transform = Transform{
+				size = {0.2, 0.2}
+			},
 			lifetime = 2,
 			speed = 20,
 			damage = 0,
@@ -1951,7 +1937,9 @@ init_weapons :: proc(){
 		automatic = true,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
-			size = {0.1, 0.1},
+			transform = Transform{
+				size = {0.1, 0.1}
+			},
 			lifetime = 2,
 			speed = 18,
 			damage = 0,
@@ -1969,13 +1957,16 @@ init_weapons :: proc(){
 
 }
 
+// ====================
+//   :CAMERA :CURSOR
+// ====================
+
 // CURSOR
 
 Cursor :: struct{
-	pos: Vec2,
-	rot: f32,
+	transform: Transform,	
+	world_transform: Transform,
 	sensitivity: f32,
-	size: Vec2,
 	filename: cstring,
 	lookahead_distance: f32,
 	lookahead: f32,
@@ -1983,14 +1974,12 @@ Cursor :: struct{
 
 init_cursor :: proc(){
 	g.cursor = Cursor{
-		//cursor position
-		pos = { 1,0 },
-		//cursor rotation
-		rot = 0,
+		transform = Transform{
+			pos = {0.5, 0},
+			size = {0.25, 0.25},
+		},
 		//sensitivity
 		sensitivity = 2,
-		//size of the cursor
-		size = { 0.25,0.25 },
 		//cursor sprite path
 		filename = "./source/assets/sprites/Cursor2.png",
 		//how far the mouse movement affects the lookahead of the camera
@@ -1999,41 +1988,50 @@ init_cursor :: proc(){
 		lookahead = 13,
 	}
 
-	init_sprite(filename = g.cursor.filename, size = g.cursor.size, id = "cursor", draw_priority = draw_layers.cursor)
+	init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, id = "cursor", draw_priority = draw_layers.cursor)
 }
 
 update_cursor :: proc(){
-	g.cursor.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * g.dt)
+	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * g.dt)
 	check_cursor_collision()
-	update_sprite(pos = Vec2{g.camera.position.x - g.camera.camera_shake.pos_offset.x, g.camera.position.y - g.camera.camera_shake.pos_offset.y} + g.cursor.pos, rot3 = {0, 0, g.cursor.rot}, id = "cursor")
+	g.cursor.world_transform = Transform{
+		pos = Vec2{g.camera.position.x - g.camera.camera_shake.pos_offset.x, g.camera.position.y - g.camera.camera_shake.pos_offset.y} + g.cursor.transform.pos,
+		size = g.cursor.transform.size,
+		rot = g.cursor.transform.rot,
+	}
+	update_sprite(transform = g.cursor.world_transform, id = "cursor")
 }
 
 //check the cursor collision with the screen
 check_cursor_collision :: proc (){
 
+	transform := &g.cursor.transform
+	pos := &transform.pos
+	size := &transform.size
+
 	wierd_const := (7.6/8)*g.camera.position.z
-	collision_offset := Vec2 {g.cursor.size.x/2, g.cursor.size.y/2}
+	collision_offset := Vec2 {size.x/2, size.y/2}
 	screen_size_from_origin := Vec2 {sapp.widthf()/2, sapp.heightf()/2}
 	pixels_per_coord: f32 = sapp.heightf()/wierd_const
 
 
 
-	if g.cursor.pos.y + collision_offset.y > screen_size_from_origin.y/ pixels_per_coord{
-		g.cursor.pos.y = (screen_size_from_origin.y / pixels_per_coord) - collision_offset.y
-	} else if g.cursor.pos.y - collision_offset.y < -(screen_size_from_origin.y / pixels_per_coord){
-		g.cursor.pos.y = -screen_size_from_origin.y / pixels_per_coord + collision_offset.y
+	if pos.y + collision_offset.y > screen_size_from_origin.y/ pixels_per_coord{
+		pos.y = (screen_size_from_origin.y / pixels_per_coord) - collision_offset.y
+	} else if pos.y - collision_offset.y < -(screen_size_from_origin.y / pixels_per_coord){
+		pos.y = -screen_size_from_origin.y / pixels_per_coord + collision_offset.y
 	}
-	if g.cursor.pos.x + collision_offset.x > screen_size_from_origin.x/ pixels_per_coord{
-		g.cursor.pos.x = (screen_size_from_origin.x / pixels_per_coord) - collision_offset.x
-	} else if g.cursor.pos.x - collision_offset.x < -(screen_size_from_origin.x/ pixels_per_coord){
-		g.cursor.pos.x = -screen_size_from_origin.x / pixels_per_coord + collision_offset.x
+	if pos.x + collision_offset.x > screen_size_from_origin.x/ pixels_per_coord{
+		pos.x = (screen_size_from_origin.x / pixels_per_coord) - collision_offset.x
+	} else if pos.x - collision_offset.x < -(screen_size_from_origin.x/ pixels_per_coord){
+		pos.x = -screen_size_from_origin.x / pixels_per_coord + collision_offset.x
 	}
 }
 
 camera_follow_cursor :: proc(){
 	//camera follows cursor
 
-	cursor_dir := g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y})
+	cursor_dir := g.cursor.transform.pos-(g.player.transform.pos - Vec2{g.camera.position.x, g.camera.position.y})
 
 	lookahead := get_vector_magnitude(cursor_dir)
 
@@ -2041,11 +2039,11 @@ camera_follow_cursor :: proc(){
 
 	lookahead /= g.cursor.lookahead
 
-	camera_follow(g.player.pos, lookahead, cursor_dir)
+	camera_follow(g.player.transform.pos, lookahead, cursor_dir)
 }
 
 camera_follow_player :: proc(lookahead: f32 = 0){
-	camera_follow(g.player.pos, lookahead, g.player.look_dir)
+	camera_follow(g.player.transform.pos, lookahead, g.player.look_dir)
 }
 
 // CAMERA
@@ -2119,14 +2117,14 @@ init_camera :: proc(){
 	g.camera.zoom.default = g.camera.position.z
 
 	//set the camera positions to the player
-	g.camera.position.x = g.player.pos.x
-	g.camera.position.y = g.player.pos.y
-	g.camera.target.x = g.player.pos.x
-	g.camera.target.y = g.player.pos.y
-	g.camera.asym_obj.position = g.player.pos
-	g.camera.asym_obj.destination = g.player.pos
-	g.camera.lookahead_asym_obj.position = g.player.pos
-	g.camera.lookahead_asym_obj.destination = g.player.pos
+	g.camera.position.x = g.player.transform.pos.x
+	g.camera.position.y = g.player.transform.pos.y
+	g.camera.target.x = g.player.transform.pos.x
+	g.camera.target.y = g.player.transform.pos.y
+	g.camera.asym_obj.position = g.player.transform.pos
+	g.camera.asym_obj.destination = g.player.transform.pos
+	g.camera.lookahead_asym_obj.position = g.player.transform.pos
+	g.camera.lookahead_asym_obj.destination = g.player.transform.pos
 
 	init_camera_shake()
 
