@@ -1059,6 +1059,7 @@ update_sprite_transform :: proc(transform: Transform, id: string){
 
 //a struct that defines layers with different draw priority
 Draw_layers :: struct{
+	background: i32,
 	item: i32,
 	default: i32,
 	text: i32,
@@ -1066,10 +1067,12 @@ Draw_layers :: struct{
 }
 
 draw_layers := Draw_layers{
+	//background
+	background = 0,
 	//items
-	item = 0,
+	item = 1,
 	//default layer
-	default = 1,
+	default = 2,
 	//text layer
 	text = 3,
 	//cursor layer
@@ -1598,12 +1601,15 @@ init_game_state :: proc(){
 	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
-	
+
+	init_sprite(filename = "source/assets/textures/hannes_sweat.png", transform = Transform{pos = {0, 0}, size = {10, 5.2}, rot = {0, 180, 180}}, draw_priority = draw_layers.background)
+
 	init_cursor()
 	test_cooldown = init_cooldown_object(1)
 }
 
 update_game_state :: proc(){
+
 	event_listener()
 
 	update_projectiles(&game_state.projectiles)
@@ -2363,7 +2369,7 @@ update_camera_shake :: proc(){
 		cs.pos_offset /= 30
 		cs.pos_offset *= cs.trauma * cs.trauma
 		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
-		cs.rot_offset /= 30
+		cs.rot_offset /= 60
 		cs.rot_offset *= cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * g.dt
