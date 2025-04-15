@@ -31,6 +31,8 @@ package main
 	antialiasing,
 	resolution scaling?,
 	fix init_icon,
+
+	make it so cursor doesnt camerashake?
 	
 	use enteties for abilities?,
 */
@@ -559,6 +561,62 @@ single_mouse_up: #sparse[sapp.Mousebutton]bool
 // =============
 //    :UTILS
 // =============
+
+//the cooldown id
+Cooldown :: u32
+
+//Timer object for cooldowns
+Cooldown_object :: struct{
+	enabled: bool,
+	cooldown: f32,
+	duration: f32,
+}
+
+//updates all the cooldowns
+update_cooldowns :: proc(){
+	for id in game_state.cooldowns{
+		cooldown_object := &game_state.cooldowns[id]
+		if cooldown_object.enabled{
+			cooldown_object.duration += g.dt
+			
+			if cooldown_object.duration > cooldown_object.cooldown{
+				cooldown_object.enabled = false
+				cooldown_object.duration = 0
+			}
+		}
+	}
+}
+
+cooldown_enabled :: proc(id: Cooldown) -> bool{
+	return game_state.cooldowns[id].enabled
+}
+
+//starts the cooldown
+start_cooldown :: proc(id: Cooldown){
+	assert(id in game_state.cooldowns)
+	cooldown_object := &game_state.cooldowns[id]
+
+	cooldown_object.enabled = true
+}
+
+//creates the cooldown object and gives the id
+init_cooldown_object :: proc(cooldown: f32) -> Cooldown{
+	id := generate_map_u32_id(game_state.cooldowns)
+
+	game_state.cooldowns[id] = Cooldown_object{
+		cooldown = cooldown,
+	}
+	
+	return Cooldown(id)
+}
+
+//generates a u32 that isnt already in the map
+generate_map_u32_id :: proc(target_map: $T) -> u32{
+	id := rand.uint32()
+	if id in target_map do id = generate_map_u32_id(target_map)
+	return id
+}
+
 
 //used to sort the draw data based on draw_priority
 compare_draw_data_draw_priority :: proc(drt: Draw_data, drt2: Draw_data) -> int{
@@ -1157,7 +1215,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 			obj.rotation_pos_offset = vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_center, obj.rot.z)
 		}
 	}
-	log.debug(text_center)
+	
 	//add the text objects to the text objects
 	g.text_objects[text_object_id] = Text_object{
 		text_objects,
@@ -1360,9 +1418,9 @@ Projectile_weapon :: struct{
 	automatic: bool,
 }
 
-//init function that runs on item_holder init
+//init function that runs when the item holder inits with a projectile weapon or when a projectile weapon is given to an item holder
 init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
-
+	
 }
 
 reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
@@ -1484,7 +1542,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 
 
 //update the item holder and check for certain tags
-update_item_holder :: proc(holder: Item_holder, look_dir: Vec2 = {0, 0}, shoot_pos: Vec2 = {0, 0}){
+update_item_holder :: proc(holder: Item_holder, look_dir: Vec2 = {1, 0}, shoot_pos: Vec2 = {0, 0}){
 	//the players item
 	item := holder.item
 	#partial switch tag2 := item.tags[get_next_index(item.tags, Entity_tags.Item)]; tag2{
@@ -1515,14 +1573,16 @@ give_item :: proc(holder: ^Item_holder, item_id: string){
 
 //game specific globals
 Game_state :: struct{
-	projectiles: [dynamic]Projectile
+	projectiles: [dynamic]Projectile,
+	cooldowns: map[Cooldown]Cooldown_object,
 }
 
 game_state: ^Game_state
 
-//test text vars
+//test vars
 test_text_rot: f32
 test_text_rot_speed: f32 = 120
+test_cooldown: u32
 
 init_game_state :: proc(){
 	game_state = new(Game_state)
@@ -1540,12 +1600,14 @@ init_game_state :: proc(){
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 	
 	init_cursor()
+	test_cooldown = init_cooldown_object(1)
 }
 
 update_game_state :: proc(){
 	event_listener()
 
 	update_projectiles(&game_state.projectiles)
+	update_cooldowns()
 	//move_camera_3D()
 	update_player()
 
@@ -1576,6 +1638,14 @@ event_listener :: proc(){
 		g.should_quit = true
 	}
 
+	if listen_key_single_down(.V){
+		if !cooldown_enabled(test_cooldown){
+			start_cooldown(test_cooldown)
+			log.debug("wadwd")
+		}
+				
+	}
+
 	//fullscreen on F11
 	if listen_key_single_down(.F11) {
 		sapp.toggle_fullscreen()
@@ -1590,6 +1660,8 @@ event_listener :: proc(){
 			tempiteminc -= 1
 		}
 	}
+
+	if sapp.mouse_locked() == false && listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
 }
 
 // PLAYER
@@ -1786,11 +1858,13 @@ update_player_abilities :: proc(){
 
 //DASH ABILITY
 
+
+//could make dashes better by replacing dash speed with how long the dash should take(dash time)
 Dash_data :: struct{
 	enabled: bool,
-	default_distance: f32,
+	dash_distance: f32,
 	button: sapp.Keycode,
-	duration_speed: f32,
+	dash_speed: f32,
 	duration: f32,
 	last_distance: f32,
 	distance: f32,
@@ -1803,11 +1877,11 @@ init_player_dash :: proc(){
 	g.player.dash = Dash_data{
 		enabled = false,
 		//distance that is going to be traveled by the player
-		default_distance = 1.6,
+		dash_distance = 1.6,
 		//dash button
 		button = .SPACE,
 		//How fast it travels
-		duration_speed = 5,
+		dash_speed = 5,
 		//cutoff var for cutting off the ease function
 		cutoff = 0.96,
 	}
@@ -1820,14 +1894,14 @@ dash_ease :: proc(x: f32) -> f32 {
 }
 
 update_player_dash :: proc(dash: ^Dash_data){
-	dash.duration +=dash.duration_speed * g.dt
-	dash.distance = dash_ease(dash.duration)
+	dash.duration += dash.dash_speed * g.dt
+	dash.distance =  dash_ease(dash.duration)
 
 	transform := &g.player.transform
 
 
 	// do the ability
-	dash_motion := linalg.normalize0(g.player.move_dir) * (dash.default_distance/dash.cutoff)
+	dash_motion := linalg.normalize0(g.player.move_dir) * (dash.dash_distance/dash.cutoff)
 	transform.pos += dash_motion * (dash.distance-dash.last_distance)
 	g.player.move_speed = 0
 
