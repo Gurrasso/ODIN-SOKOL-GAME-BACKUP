@@ -1859,7 +1859,7 @@ update_player_abilities :: proc(){
 //DASH ABILITY
 
 
-//could make dashes better by replacing dash speed with how long the dash should take(dash time)
+// TODO: could make dashes better by replacing dash speed with how long the dash should take(dash time)
 Dash_data :: struct{
 	enabled: bool,
 	dash_distance: f32,
