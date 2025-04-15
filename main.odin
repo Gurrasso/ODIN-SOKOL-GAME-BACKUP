@@ -328,7 +328,7 @@ cleanup_cb :: proc "c" (){
 //Every frame
 frame_cb :: proc "c" (){
 	context = default_context
-
+	
 	//exit the program
 	if(g.should_quit){
 		quit_game()
