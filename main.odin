@@ -3,7 +3,9 @@ package main
 
 /*
 	TODO: 
-		
+	
+	FIX IMAGES NOT BEING ROTATED CORRECTLY ON INIT,
+
 	generate an image atlas on init with all the images instead of loading induvidual images?
 	fix images having positions that are inbetween pixels,
 
