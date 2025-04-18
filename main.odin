@@ -4,8 +4,8 @@ package main
 /*
 	TODO: 
 	
-	FIX IMAGES NOT BEING ROTATED CORRECTLY ON INIT,
-
+	idk why images are normally upside down on init, but i fixed it?
+	
 	generate an image atlas on init with all the images instead of loading induvidual images?
 	fix images having positions that are inbetween pixels,
 
@@ -136,7 +136,9 @@ Transform :: struct{
 }
 
 DEFAULT_TRANSFORM: Transform = {
-	size = {0.5, 0.5}
+	size = {0.5, 0.5},
+	pos = {0, 0},
+	rot = {0, 0, 0}
 }
 
 Spring :: struct{
@@ -364,7 +366,7 @@ frame_cb :: proc "c" (){
 			//matrix
 
 			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
-			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 	
 			//apply the bindings(something that says which things we want to draw)
@@ -387,7 +389,7 @@ frame_cb :: proc "c" (){
 	for id in g.objects {
 		for obj in g.objects[id].objects{
 		//matrix
-			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.y), to_radians(obj.rot.x), to_radians(obj.rot.z))
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z+180))
 	
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
@@ -1604,7 +1606,7 @@ init_game_state :: proc(){
 	
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
 
-	init_sprite(filename = "source/assets/textures/hannes_sweat.png", transform = Transform{pos = {0, 0}, size = {10, 5.2}, rot = {0, 180, 180}}, draw_priority = draw_layers.background)
+	init_sprite(filename = "source/assets/textures/hannes_sweat.png", transform = Transform{pos = {0, 0}, size = {10, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
 
 	init_cursor()
 	test_cooldown = init_cooldown_object(1)
@@ -1774,7 +1776,7 @@ update_player :: proc() {
 		player.xflip = -1
 	}
 
-	transform.rot.y = (player.xflip + 1) * 90
+	transform.rot.x = 180-((player.xflip + 1) * 90)
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
@@ -1825,7 +1827,7 @@ update_player :: proc() {
 
 	new_holder_rotation := to_degrees(linalg.atan2(holder_rotation_vector.y, holder_rotation_vector.x))
 	holder.transform.rot.z = new_holder_rotation
-	holder.transform.rot.y = transform.rot.z
+	holder.transform.rot.x = transform.rot.z
 
 
 	
