@@ -14,9 +14,9 @@ package main
 	fix text \n not working,
 
 	add updating of vertex_buffers,
-
-	add weapon shoot delay,
-	timer obj,
+	
+	make it so item holders can hold nothing,
+	weapons dont work for multiple things at a time,
 	
 	make sure everything that should use the transform struct uses it,
 	make sure we use the same naming for pos, rot ect everywhere,
@@ -228,7 +228,7 @@ main :: proc(){
 init_cb :: proc "c" (){
 	context = default_context
 	
-	//init_icon("./source/assets/sprites/ase256.png")
+	//init_icon("./src/assets/sprites/ase256.png")
 
 	//setup for the sokol graphics
 	sg.setup({
@@ -651,13 +651,14 @@ sg_range_from_slice :: proc(s: []$T) -> sg.Range{
 
 //color utils
 
-sg_color :: proc {
+sg_color :: proc{
 	sg_color_from_rgb,
 	sg_color_from_rgba,
 }
 
 
-sg_color_from_rgba :: proc (color: Vec4) -> sg.Color{
+sg_color_from_rgba :: proc (color4: Vec4) -> sg.Color{
+	color := color4
 
 	new_color := sg.Color{color.r/255, color.g/255, color.b/255, color.a/255}
 
@@ -665,7 +666,8 @@ sg_color_from_rgba :: proc (color: Vec4) -> sg.Color{
 
 }
 
-sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
+sg_color_from_rgb :: proc (color3: Vec3) -> sg.Color{
+	color := color3
 
 	new_color := sg.Color{color.r/255, color.g/255, color.b/255, 1}
 
@@ -962,13 +964,13 @@ init_icon :: proc(imagefile: cstring){
 //   :DRAWING
 // =============
 
-WHITE_IMAGE_PATH : cstring = "./source/assets/textures/WHITE_IMAGE.png"
+WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color_offset: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
+init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
 
-	init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority)	
+	init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 
 }
 
@@ -978,15 +980,11 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
-
-
-	//color offset
-	WHITE :: sg.Color { 1,1,1,1 }
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }){
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
-	vertex_buffer := get_vertex_buffer(transform.size, WHITE, DEFAULT_UV, tex_index)
+	vertex_buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
 	
 	if id in g.objects == false{
 		g.objects[id] = Object_group{}
@@ -1063,24 +1061,30 @@ update_sprite_transform :: proc(transform: Transform, id: string){
 
 //a struct that defines layers with different draw priority
 Draw_layers :: struct{
+	bottom: f32,
 	background: i32,
 	item: i32,
 	default: i32,
 	text: i32,
 	cursor: i32,
+	top: i32,
 }
 
 draw_layers := Draw_layers{
+	//bottom layer
+	bottom = 0,
 	//background
-	background = 0,
+	background = 1,
 	//items
-	item = 1,
+	item = 2,
 	//default layer
-	default = 2,
+	default = 3,
 	//text layer
-	text = 3,
+	text = 4,
 	//cursor layer
-	cursor = 10,
+	cursor = 5,
+	//top layer
+	top = 6,
 }
 
 // TEX_INDICES
@@ -1233,7 +1237,7 @@ append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_o
 	}
 
 	//show the center point of the text
-	//init_rect(sg_color(Vec3{255, 255, 255}), text_center, {0.05, 0.05}, "center")
+	//init_rect(color = sg_color(color3 = Vec3{255, 255, 255}), text_center, {0.05, 0.05}, "center")
 }
 
 //initiate font and add it to the g.fonts
@@ -1390,6 +1394,13 @@ entity_id_get_component :: proc(id: string, $component_type: typeid) -> ^compone
 	return component
 }
 
+entity_log_component_ptr  :: proc(entity: ecs.Entity, $component_type: typeid){
+	component, error := ecs.get_component(&ctx, entity, component_type)
+	if error != .NO_ERROR do log.debug(error)
+	log.debug(&component)
+}
+
+
 
 //COMPONENTS
 
@@ -1409,6 +1420,10 @@ update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: strin
 
 //projectile weapon
 Projectile_weapon :: struct{
+	//id of the cooldown object that is linked to this weapon
+	cooldown_object: Cooldown,
+	//cooldown of the weapon
+	cooldown: f32,
 	//shoot button
 	trigger: sapp.Mousebutton,
 	//a radian value that uses the add_randomness_vec2 function to add some randomness to the projectile directions
@@ -1427,7 +1442,7 @@ Projectile_weapon :: struct{
 
 //init function that runs when the item holder inits with a projectile weapon or when a projectile weapon is given to an item holder
 init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
-	
+	weapon.cooldown_object = init_cooldown_object(weapon.cooldown)	
 }
 
 reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
@@ -1439,10 +1454,12 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 	//add a projectile to the array if you press the right trigger
 	should_shoot: bool
 	
-	if !weapon.automatic do should_shoot = listen_mouse_single_down(weapon.trigger)
+	if cooldown_enabled(weapon.cooldown_object) do should_shoot = false
+	else if !weapon.automatic do should_shoot = listen_mouse_single_down(weapon.trigger)
 	else do should_shoot = listen_mouse_down(weapon.trigger)
 
 	if should_shoot{
+		start_cooldown(weapon.cooldown_object)
 		for i := 0; i < weapon.shots; i += 1{
 			
 						
@@ -1532,6 +1549,7 @@ Item_holder :: struct{
 
 //init an item holder and check for certain tags
 init_item_holder :: proc(holder: ^Item_holder){
+
 	item := holder.item
 	assert(contains(item.tags, Entity_tags.Item))
 
@@ -1602,11 +1620,15 @@ init_game_state :: proc(){
 
 	init_camera()
 
-	init_font(font_path = "./source/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
+	init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(Vec3{138,43,226}), font_id = "font1")
+	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
+	
 
-	init_sprite(filename = "source/assets/textures/hannes_sweat.png", transform = Transform{pos = {0, 0}, size = {10, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {4.9, 0}, size = {.2, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {-4.9, 0}, size = {.2, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
 
 	init_cursor()
 	test_cooldown = init_cooldown_object(1)
@@ -1671,7 +1693,7 @@ event_listener :: proc(){
 		}
 	}
 
-	if sapp.mouse_locked() == false && listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
+	if !sapp.mouse_locked() && listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
 }
 
 // PLAYER
@@ -1705,7 +1727,7 @@ init_player :: proc(){
 
 	g.player = Player{
 		id = "Player",
-		sprite_filename = "./source/assets/textures/Random.png",
+		sprite_filename = "./src/assets/textures/Random.png",
 		
 		transform = {
 			size = {1, 1}
@@ -1956,8 +1978,8 @@ init_items :: proc(){
 	init_weapons()
 
 	empty_item_data := Item_data{
-		img = get_image("./source/assets/textures/transparent.png"),
-		size = {1, 1}
+		img = get_image("./src/assets/textures/transparent.png"),
+		size = {1, 1},
 	}
 	create_entity("empty", {.Item})
 	entity_add_component("empty", empty_item_data)
@@ -1971,6 +1993,8 @@ init_weapons :: proc(){
 		trigger = .LEFT,
 		random_spread = 0.05,
 		shots = 1,
+		cooldown = 0.22,
+		automatic = true,
 		camera_shake = 1.5,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
@@ -1995,6 +2019,7 @@ init_weapons :: proc(){
 		trigger = .LEFT,
 		random_spread = 0.3,
 		shots = 5,
+		cooldown = 0.5,
 		spread = 0.12,
 		camera_shake = 1.6,
 		projectile = Projectile{
@@ -2019,6 +2044,7 @@ init_weapons :: proc(){
 		trigger = .LEFT,
 		random_spread = 0.2,
 		shots = 1,
+		cooldown = 0.1,
 		spread = 0,
 		camera_shake = 1.1,
 		automatic = true,
@@ -2068,7 +2094,7 @@ init_cursor :: proc(){
 		//sensitivity
 		sensitivity = 2,
 		//cursor sprite path
-		filename = "./source/assets/sprites/Cursor2.png",
+		filename = "./src/assets/sprites/Cursor2.png",
 		//how far the mouse movement affects the lookahead of the camera
 		lookahead_distance = 10,
 		//divides the lookahead distance to get the actual lookahead of the camera
