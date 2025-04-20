@@ -2382,7 +2382,7 @@ init_camera_shake :: proc(){
 		pos_offset = { 0,0 },
 		rot_offset = 0,
 		seed = 223492,
-		time_offset = {5, 5}
+		time_offset = { 5,5 }
 	}
 }
 
@@ -2399,7 +2399,7 @@ update_camera_shake :: proc(){
 		cs.pos_offset /= 30
 		cs.pos_offset *= cs.trauma * cs.trauma
 		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
-		cs.rot_offset /= 60
+		cs.rot_offset /= 70
 		cs.rot_offset *= cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * g.dt
