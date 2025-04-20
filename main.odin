@@ -35,6 +35,7 @@ package main
 	fix init_icon,
 
 	make it so cursor doesnt camerashake?
+	cursor changes size when camera changes z pos whilst game is running,
 	
 	use enteties for abilities?,
 */
@@ -334,13 +335,14 @@ frame_cb :: proc "c" (){
 	context = default_context
 	
 	//exit the program
-	if(g.should_quit){
+	if g.should_quit {
 		quit_game()
 		return
 	}
 
 	//deltatime
 	g.dt = f32(sapp.frame_duration())
+	
 	//updates
 	update_game_state()
 	
@@ -407,7 +409,7 @@ frame_cb :: proc "c" (){
 		}	
 	}
 
-	//sort the array based on draw_priority
+	//sort the array based on draw_priority so we can chose which things we want to be drawn over other, higher draw priority means that it gets drawn after(on top)
 	sort.quick_sort_proc(draw_data[:], compare_draw_data_draw_priority)
 
 	for drt in draw_data {
@@ -1584,6 +1586,7 @@ update_item_holder :: proc(holder: Item_holder, look_dir: Vec2 = {1, 0}, shoot_p
 
 //gives an item to the item holder which potentially replaces the old one, the inits the holder
 give_item :: proc(holder: ^Item_holder, item_id: string){
+	assert(item_id in g.enteties)
 	
 	remove_object(holder.sprite_id)
 	holder.item = g.enteties[item_id]
@@ -1654,7 +1657,7 @@ update_game_state :: proc(){
 	g.frame_count += 1
 }
 
-//proc for quiting the game
+//proc for quiting the game immediately, is called in the beginning of the frame if g.should_quit == true
 quit_game :: proc(){
 	sapp.quit()
 }
@@ -1721,7 +1724,7 @@ init_player :: proc(){
 		sprite_filename = "./src/assets/textures/Random.png",
 		
 		transform = {
-			size = {1, 1}
+			size = { 1,1 }
 		},
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
@@ -2035,7 +2038,7 @@ init_weapons :: proc(){
 		trigger = .LEFT,
 		random_spread = 0.2,
 		shots = 1,
-		cooldown = 0.1,
+		cooldown = .06,
 		spread = 0,
 		camera_shake = 1.1,
 		automatic = true,
@@ -2091,6 +2094,11 @@ init_cursor :: proc(){
 		//divides the lookahead distance to get the actual lookahead of the camera
 		lookahead = 13,
 	}
+	
+	//this is just to make cursor sizes a little larger
+	g.cursor.transform.size /= 11
+	//this makes cursor sizes consistant regardless of camera z pos (on init)
+	g.cursor.transform.size *= g.camera.position.zz
 
 	init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, id = "cursor", draw_priority = draw_layers.cursor)
 }
