@@ -1607,12 +1607,12 @@ game_state: ^Game_state
 //test vars
 test_text_rot: f32
 test_text_rot_speed: f32 = 120
-test_cooldown: u32
 
 init_game_state :: proc(){
 	game_state = new(Game_state)
-
+	
 	init_items()
+	
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
 
@@ -1625,13 +1625,12 @@ init_game_state :: proc(){
 	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
 	
 
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {4.9, 0}, size = {.2, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 200}), transform = Transform{pos = {-4.9, 0}, size = {.2, 5.2}, rot = {0, 0, 0}}, draw_priority = draw_layers.top)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
 
 	init_cursor()
-	test_cooldown = init_cooldown_object(1)
 }
 
 update_game_state :: proc(){
@@ -1668,14 +1667,6 @@ event_listener :: proc(){
 	//Exit program if you hit escape
 	if listen_key_down(.ESCAPE) {
 		g.should_quit = true
-	}
-
-	if listen_key_single_down(.V){
-		if !cooldown_enabled(test_cooldown){
-			start_cooldown(test_cooldown)
-			log.debug("wadwd")
-		}
-				
 	}
 
 	//fullscreen on F11
@@ -2088,7 +2079,7 @@ Cursor :: struct{
 init_cursor :: proc(){
 	g.cursor = Cursor{
 		transform = Transform{
-			pos = {0.5, 0},
+			pos = {1, 0},
 			size = {0.25, 0.25},
 		},
 		//sensitivity
