@@ -34,6 +34,20 @@ package main
 	resolution scaling?,
 	fix init_icon,
 
+
+	particle system implemented as a structure of arrays:
+	Particles :: struct {
+		positions [dynamic]Vec2,
+		array,
+		universal particle data,
+	} instead of:
+	Particle :: struct {
+		pos: Vec3,
+		other data,
+	}
+	Particles: [dynamic]Particle
+
+
 	make it so cursor doesnt camerashake?
 	cursor changes size when camera changes z pos whilst game is running,
 	
