@@ -5,6 +5,7 @@ package main
 	TODO: 
 
 	add the bindings, shader and other similar stuff to its own variable,
+	abstract the things in the frame cb function,
 	
 	idk why images are normally upside down on init, but i fixed it?
 	
