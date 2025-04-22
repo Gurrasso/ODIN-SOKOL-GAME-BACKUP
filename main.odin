@@ -3,6 +3,8 @@ package main
 
 /*
 	TODO: 
+
+	add the bindings, shader and other similar stuff to its own variable,
 	
 	idk why images are normally upside down on init, but i fixed it?
 	
