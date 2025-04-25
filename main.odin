@@ -7,8 +7,6 @@ package main
 	add the bindings, shader and other similar stuff to its own variable,
 	abstract the things in the frame cb function,
 	
-	idk why images are normally upside down on init, but i fixed it?
-	
 	generate an image atlas on init with all the images instead of loading induvidual images?
 	fix images having positions that are inbetween pixels,
 
@@ -408,7 +406,7 @@ frame_cb :: proc "c" (){
 	for id in g.objects {
 		for obj in g.objects[id].objects{
 		//matrix
-			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z+180))
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
@@ -1809,7 +1807,7 @@ update_player :: proc() {
 		player.xflip = -1
 	}
 
-	transform.rot.x = 180-((player.xflip + 1) * 90)
+	transform.rot.x = (player.xflip + 1) * 90
 	//g.player.look_dir = linalg.normalize0(g.cursor.pos-(g.player.pos - Vec2{g.camera.position.x, g.camera.position.y}))
 	//g.player.look_dir = g.player.move_dir
 
