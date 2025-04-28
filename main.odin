@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	check if text rotation is broken,
+
 	add the bindings, shader and other similar stuff to its own variable,
 	abstract the things in the frame cb function,
 	
