@@ -4,11 +4,6 @@ package main
 /*
 	TODO: 
 
-	check if text rotation is broken,
-
-	add the bindings, shader and other similar stuff to its own variable,
-	abstract the things in the frame cb function,
-	
 	generate an image atlas on init with all the images instead of loading induvidual images?
 	fix images having positions that are inbetween pixels,
 
@@ -181,11 +176,6 @@ Globals :: struct {
 	runtime: f32,
 	frame_count: i32,
 	dt: f32,
-	//graphics stuff
-	shader: sg.Shader,
-	pipeline: sg.Pipeline,
-	index_buffer: sg.Buffer,	
-	sampler: sg.Sampler,
 	//Objects for drawing
 	text_objects: map[string]Text_object,
 	objects: map[string]Object_group,
@@ -193,7 +183,6 @@ Globals :: struct {
 	camera: Camera,
 	player: Player,
 	cursor: Cursor,
-
 	//used to avoid initing multiple of the same buffer
 	vertex_buffers: [dynamic]Vertex_buffer_data,
 	//used to avoid initing mutiple of the same img
@@ -202,6 +191,17 @@ Globals :: struct {
 	fonts: map[string]FONT_INFO,
 	enteties: Enteties,
 }
+
+Rendering_globals :: struct {
+	//graphics stuff
+	shader: sg.Shader,
+	pipeline: sg.Pipeline,
+	index_buffer: sg.Buffer,	
+	sampler: sg.Sampler,
+}
+
+rg: ^Rendering_globals
+
 g: ^Globals
 
 
@@ -257,6 +257,7 @@ init_cb :: proc "c" (){
 
 	//the globals
 	g = new(Globals)
+	rg = new(Rendering_globals)
 
 	//white image for scuffed rect rendering
 	WHITE_IMAGE = get_image(WHITE_IMAGE_PATH)
@@ -264,9 +265,9 @@ init_cb :: proc "c" (){
 
 
 	//make the shader and pipeline
-	g.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
+	rg.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
 	pipeline_desc : sg.Pipeline_Desc = {
-		shader = g.shader,
+		shader = rg.shader,
 		layout = {
 			//different attributes
 			attrs = {
@@ -298,7 +299,7 @@ init_cb :: proc "c" (){
 	}
 	
 	pipeline_desc.colors[0] = { blend = blend_state}
-	g.pipeline = sg.make_pipeline(pipeline_desc)
+	rg.pipeline = sg.make_pipeline(pipeline_desc)
 
 	// indices
 	indices := []u16 {
@@ -306,13 +307,13 @@ init_cb :: proc "c" (){
 		2, 1, 3,
 	}
 	// index buffer
-	g.index_buffer = sg.make_buffer({
+	rg.index_buffer = sg.make_buffer({
 		type = .INDEXBUFFER,
 		data = sg_range(indices),
 	})
 
 	//create the sampler
-	g.sampler = sg.make_sampler({})
+	rg.sampler = sg.make_sampler({})
 
 	init_game_state()
 }
@@ -332,13 +333,14 @@ cleanup_cb :: proc "c" (){
 		sg.destroy_image(image.image)
 	}
 
-	sg.destroy_sampler(g.sampler)
-	sg.destroy_buffer(g.index_buffer)
-	sg.destroy_pipeline(g.pipeline)
-	sg.destroy_shader(g.shader)
+	sg.destroy_sampler(rg.sampler)
+	sg.destroy_buffer(rg.index_buffer)
+	sg.destroy_pipeline(rg.pipeline)
+	sg.destroy_shader(rg.shader)
 
 	//free the global vars
 	free(g)
+	free(rg)
 	free(game_state)
 	free_all()
 
@@ -375,7 +377,7 @@ frame_cb :: proc "c" (){
 	sg.begin_pass({ swapchain = shelpers.glue_swapchain()})
 
 	//apply the pipeline to the sokol graphics
-	sg.apply_pipeline(g.pipeline)
+	sg.apply_pipeline(rg.pipeline)
 
 	draw_data: [dynamic]Draw_data
 
@@ -391,9 +393,9 @@ frame_cb :: proc "c" (){
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
 				vertex_buffers = { 0 = obj.vertex_buffer },
-				index_buffer = g.index_buffer,
+				index_buffer = rg.index_buffer,
 				images = { IMG_tex = obj.img },
-				samplers = { SMP_smp = g.sampler },
+				samplers = { SMP_smp = rg.sampler },
 			}
 
 			append(&draw_data, Draw_data{
@@ -407,15 +409,15 @@ frame_cb :: proc "c" (){
 	//do things for all objects
 	for id in g.objects {
 		for obj in g.objects[id].objects{
-		//matrix
+			//matrix
 			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
 				vertex_buffers = { 0 = obj.vertex_buffer },
-				index_buffer = g.index_buffer,
+				index_buffer = rg.index_buffer,
 				images = { IMG_tex = obj.img },
-				samplers = { SMP_smp = g.sampler },
+				samplers = { SMP_smp = rg.sampler },
 			}
 
 			append(&draw_data, Draw_data{
