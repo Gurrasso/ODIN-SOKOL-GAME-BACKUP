@@ -5,7 +5,7 @@ package main
 	TODO: 
 
 	generate an image atlas on init with all the images instead of loading induvidual images?
-	fix images having positions that are inbetween pixels,
+	fix images having positions that are inbetween pixels, maybe using projection matrix?,
 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
