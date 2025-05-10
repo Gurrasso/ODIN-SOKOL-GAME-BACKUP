@@ -5,19 +5,21 @@ package main
 	TODO: 
 
 	generate an image atlas on init with all the images instead of loading induvidual images?
-	fix images having positions that are inbetween pixels, maybe using projection matrix?,
+	fix sprites being wierd and having subpixel positions,
 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
 	fix text \n not working,
+	fix small characters like .,: having the wrong spacing,
+	maybe add .CORNER, .CENTER etc, for text alignment,
 
 	add updating of vertex_buffers,
 	
 	make it so item holders can hold nothing,
-	weapons dont work for multiple things at a time,
+	weapons dont work for multiple enteties at a time,
 	
 	make sure everything that should use the transform struct uses it,
-	make sure we use the same naming for pos, rot ect everywhere,
+	make sure we use the same naming for pos, rot etc everywhere,
 
 	automatically give sprite ids instead of having to assign them manually,
 
@@ -29,7 +31,7 @@ package main
 	
 	lighting(normalmaps),
 	antialiasing,
-	resolution scaling?,
+	resolution scaling? maybe use the projection matrix to get the relation between coords and pixels?,
 	fix init_icon,
 
 
@@ -281,10 +283,10 @@ init_cb :: proc "c" (){
 		// specify that we want to use index buffer
 		index_type = .UINT16,
 		//make it so objects draw based on distance from camera
-		depth = {
-			write_enabled = true,
-			compare = .LESS_EQUAL
-		},
+		//depth = {
+		//	write_enabled = true,
+		//	compare = .LESS_EQUAL
+		//},
 	}
 	
 	//the blend state for working with alphas
@@ -883,7 +885,7 @@ remove_text_object :: proc(id: string) {
 
 vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 	obj_xform := xform_rotate(-rot)
-	obj_xform *= xform_translate(objpos - centerpos)
+	obj_xform *= xform_translate(Vec2{objpos.x, -objpos.y} - {centerpos.x, -centerpos.y})
 
 	new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{centerpos.x, -centerpos.y}
 	return Vec2{new_pos2d.x, -new_pos2d.y} - objpos
@@ -1121,7 +1123,7 @@ tex_indices := Tex_indices{
 }
 
 // ==========
-//   :FONT			 (	 a bit scuffed rn, gonna fix later(probably not)	 )
+//   :FONT			 (	 only a little scuffed	 )
 // ==========
 
 Char_object :: struct{
@@ -1153,7 +1155,7 @@ font_bitmap_h :: 256
 char_count :: 96
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text, draw_from_center: bool = false) {
 	using stbtt
 
 	assert(font_id in g.fonts)
@@ -1174,25 +1176,26 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 	x: f32
 	y: f32
 
+	draw_offset: f32
+
 	text_objects : [dynamic]Char_object
 
 	for char in text {
-		
+
+		q: aligned_quad
 		advance_x: f32
 		advance_y: f32
-		q: aligned_quad
 
 		GetBakedQuad(&font_data[0], font_bitmap_w, font_bitmap_h, cast(i32)char - 32, &advance_x, &advance_y, &q, false)
-		
-		
+
+
+		x += advance_x
+		y += advance_y
+
+				
 		size := Vec2{ abs(q.x0 - q.x1), abs(q.y0 - q.y1) }
 		
-		bottom_left := Vec2{ q.x0, -q.y1 }
-		top_right := Vec2{ q.x1, -q.y0 }
-
-		assert(bottom_left + size == top_right)
-		
-		offset_to_render_at := Vec2{x,y} + bottom_left
+		offset_to_render_at := Vec2{x,y}
 		
 		uv := Vec4{ q.s0, q.t1, q.s1, q.t0 }
 
@@ -1200,44 +1203,51 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 		xform *= xform_translate(pos)
 		xform *= xform_scale(Vec2{auto_cast scale, auto_cast scale})
 		xform *= xform_translate(offset_to_render_at)
+		
 
 		text_size := size*scale
 		char_pos := Vec2{xform[3][0], xform[3][1]}
+
+		//just to align the text properly
+		if x - advance_x == 0{
+			draw_offset = (text_size.x/2) - char_pos.x
+		}
+	
+		char_pos.y += text_size.y/2
+		char_pos.x += draw_offset
 
 		char_obj := generate_char_object(char_pos, text_size, uv, color, atlas_image)
 
 
 		append(&text_objects, char_obj)
 
-		x +=	advance_x
-		y += -advance_y
 	}
 
-	append_text_object(rotation, text_objects, text_object_id, pos, draw_priority)
+	append_text_object(rotation, text_objects, text_object_id, pos, draw_priority, draw_from_center)
 	
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: string, text_pos: Vec2, draw_priority: i32){
+append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: string, text_pos: Vec2, draw_priority: i32, draw_from_center: bool){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
 	//Figure out the center point of the text
-	positions_total := Vec2{ 0,0 }
+	positions_total: Vec2
 	for obj in text_objects{
 		positions_total += Vec2{obj.pos.x, obj.pos.y}
 	}
 	text_center = positions_total/Vec2{f32(len(text_objects)), f32(len(text_objects))}
-	
-	//make the center y coord not be the center of all the positions. Instead it is the designated y coord for the text
-	text_center.y = text_pos.y
 
-	//offset the text so its center is at the text pos
-	difference := text_center-text_pos
-	text_center = text_pos
-	for &obj in text_objects{
-		obj.pos -= Vec3{difference.x, difference.y, 0}
-	}
-
+	//offset the text so its center is at the text pos if draw_from_center is set to true
+	if draw_from_center {
+		
+		difference := text_center-text_pos
+		text_center -= difference
+		
+		for &obj in text_objects{
+			obj.pos -= Vec3{difference.x, difference.y, 0}
+		}
+	}	
 
 	//rotation things
 	if text_rot.z != 0{
@@ -1644,8 +1654,7 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
-	
+	init_text(draw_from_center = true, text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
 
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
@@ -1668,7 +1677,7 @@ update_game_state :: proc(){
 
 	update_cursor()
 
-	test_text_rot += test_text_rot_speed * g.dt
+	test_text_rot -= test_text_rot_speed * g.dt
 	update_text(test_text_rot, "test_text")
 
 	mouse_move = {}
@@ -2008,7 +2017,7 @@ init_weapons :: proc(){
 		shots = 1,
 		cooldown = 0.22,
 		automatic = true,
-		camera_shake = 1.5,
+		camera_shake = 1.4,
 		projectile = Projectile{
 			img = get_image(WHITE_IMAGE_PATH),
 			transform = Transform{
@@ -2414,13 +2423,14 @@ update_camera_shake :: proc(){
 		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
 
 		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
-		cs.pos_offset /= 30
+		cs.pos_offset /= 50
 		cs.pos_offset *= cs.trauma * cs.trauma
 		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
-		cs.rot_offset /= 70
-		cs.rot_offset *= cs.trauma * cs.trauma
+		cs.rot_offset /= 100
+		cs.rot_offset *= cs.trauma * cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * g.dt
+		if cs.trauma < 0 do cs.trauma = 0
 	}
 }
 
