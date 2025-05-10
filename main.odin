@@ -31,7 +31,7 @@ package main
 	
 	lighting(normalmaps),
 	antialiasing,
-	resolution scaling? maybe use the projection matrix to get the relation between coords and pixels?,
+	resolution scaling? maybe use the projection matrix to get the relation between coords and pixels? or try and change the dpi/res with sokol?,
 	fix init_icon,
 
 
