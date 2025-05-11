@@ -1000,7 +1000,7 @@ WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
 	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 }
 
@@ -1010,7 +1010,7 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -1040,7 +1040,7 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
 	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
