@@ -93,7 +93,7 @@ Mat4 :: matrix[4, 4]f32
 Vec2 :: [2]f32
 Vec3 :: [3]f32
 Vec4 :: [4]f32
-Id :: i32
+Id :: u32
 
 //draw call data
 Draw_data :: struct{
@@ -637,6 +637,13 @@ init_cooldown_object :: proc(cooldown: f32) -> Cooldown{
 	return Cooldown(id)
 }
 
+//generate an id from the runtime and a random float
+generate_string_id :: proc() -> string{
+	builder := strings.builder_make()
+	strings.write_f32(&builder, f32(g.runtime) + rand.float32_range(0, 100), 'f')
+	return strings.to_string(builder)
+}
+
 //generates a u32 that isnt already in the map
 generate_map_u32_id :: proc(target_map: $T) -> u32{
 	id := rand.uint32()
@@ -987,14 +994,14 @@ init_icon :: proc(imagefile: cstring){
 //   :DRAWING
 // =============
 
+Sprite_id :: string
+
 WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "rect", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
-
-	init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
-
+init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 }
 
 
@@ -1003,12 +1010,17 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }){
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
+	id := id
+	if id == ""{
+		id = generate_string_id()
+	}
+
 	vertex_buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
-	
+
 	if id in g.objects == false{
 		g.objects[id] = Object_group{}
 	}
@@ -1022,12 +1034,14 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 		draw_priority,
 		vertex_buffer,
 	})
+
+	return id
 }
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: string = "sprite", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default){
-	init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
+init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: string = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
 //involves some code duplication
@@ -1152,15 +1166,20 @@ FONT_INFO :: struct {
 
 font_bitmap_w :: 256
 font_bitmap_h :: 256
-char_count :: 96
+char_count :: 256
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text, draw_from_center: bool = false) {
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text, draw_from_center: bool = false) -> string{
 	using stbtt
 
 	assert(font_id in g.fonts)
 
 	assert(text_object_id in g.text_objects == false)
+	
+	text_object_id := text_object_id
+	if text_object_id == ""{
+		text_object_id = generate_string_id()
+	}
 
 	rotation : Vec3 = {0, 0, text_rot}
 
@@ -1191,7 +1210,6 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 
 		x += advance_x
 		y += advance_y
-
 				
 		size := Vec2{ abs(q.x0 - q.x1), abs(q.y0 - q.y1) }
 		
@@ -1225,6 +1243,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 
 	append_text_object(rotation, text_objects, text_object_id, pos, draw_priority, draw_from_center)
 	
+	return text_object_id
 }
 
 append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: string, text_pos: Vec2, draw_priority: i32, draw_from_center: bool){
@@ -1286,7 +1305,6 @@ init_font :: proc(font_path: string, font_h: i32 = 16, id: string) {
 	ret := BakeFontBitmap(raw_data(ttf_data), 0, auto_cast font_height, auto_cast bitmap, font_bitmap_w, font_bitmap_h, 32, char_count, &font_char_data[0])
 	assert(ret > 0, "not enough space in bitmap")
 	
-
 	// setup font atlas so we can use it in the shader
 	desc : sg.Image_Desc
 	desc.width = auto_cast font_bitmap_w
@@ -1440,9 +1458,9 @@ Item_data :: struct{
 	size: Vec2,
 }
 
-init_item :: proc(transform: ^Transform, item_data: Item_data, sprite_id: string){
+init_item :: proc(transform: ^Transform, item_data: Item_data) -> Sprite_id{
 	transform.size = item_data.size
-	init_sprite(item_data.img, transform^, sprite_id, draw_priority = draw_layers.item)
+	return init_sprite(item_data.img, transform^, "", draw_priority = draw_layers.item)
 }
 
 update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: string){
@@ -1492,12 +1510,8 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 	if should_shoot{
 		start_cooldown(weapon.cooldown_object)
 		for i := 0; i < weapon.shots; i += 1{
-			
 						
-			//generate an id from the frame count
-			builder := strings.builder_make()
-			strings.write_f32(&builder, f32(g.frame_count) + f32(i), 'f')
-			sprite_id := strings.to_string(builder)
+			sprite_id := generate_string_id()
 		
 			//offset position of shots if we shoot multiple
 			shoot_dir := shoot_dir
@@ -1573,7 +1587,7 @@ remove_projectile :: proc(projectile: ^Projectile){
 Item_holder :: struct{
 	transform: Transform,	
 	item: Entity,
-	sprite_id: string,
+	sprite_id: Sprite_id,
 	//if items like guns should be equipped
 	equipped: bool,
 }
@@ -1593,7 +1607,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 	}
 
 	item_data := entity_get_component(entity = item.entity, component_type = Item_data)
-	init_item(&holder.transform, item_data^, holder.sprite_id)
+	holder.sprite_id = init_item(&holder.transform, item_data^)
 }
 
 
@@ -1639,6 +1653,7 @@ game_state: ^Game_state
 //test vars
 test_text_rot: f32
 test_text_rot_speed: f32 = 120
+test_text_id: string
 
 init_game_state :: proc(){
 	game_state = new(Game_state)
@@ -1654,7 +1669,7 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	init_text(draw_from_center = true, text_object_id = "test_text", text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, text = "TEST", color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
+	test_text_id = init_text(text = "TÅST", draw_from_center = true, text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
 
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
@@ -1678,7 +1693,7 @@ update_game_state :: proc(){
 	update_cursor()
 
 	test_text_rot -= test_text_rot_speed * g.dt
-	update_text(test_text_rot, "test_text")
+	update_text(test_text_rot, test_text_id)
 
 	mouse_move = {}
 	g.runtime += g.dt
@@ -1720,7 +1735,7 @@ event_listener :: proc(){
 
 // PLAYER
 Player :: struct{
-	id: string,
+	sprite_id: Sprite_id,
 	sprite_filename: cstring,
 	transform: Transform,	
 	xflip: f32,
@@ -1748,7 +1763,6 @@ init_player :: proc(){
 	// setup the player
 
 	g.player = Player{
-		id = "Player",
 		sprite_filename = "./src/assets/textures/Random.png",
 		
 		transform = {
@@ -1767,7 +1781,6 @@ init_player :: proc(){
 
 		holder = {
 			item = g.enteties["gun"],
-			sprite_id = "playerholder",
 			equipped = true,
 		},
 		
@@ -1778,7 +1791,7 @@ init_player :: proc(){
 	init_player_abilities()
 
 	//init the players sprite
-	init_sprite(g.player.sprite_filename, g.player.transform, g.player.id)
+	g.player.sprite_id = init_sprite(g.player.sprite_filename, g.player.transform)
 	//init the players item_holder
 	init_item_holder(&g.player.holder)
 }
@@ -1812,7 +1825,7 @@ update_player :: proc() {
 	right := Vec2{1,0}
 
 	motion : Vec2
-	
+
 	//for flipping the player sprite
 	if g.cursor.transform.pos.x+g.camera.position.x <= transform.pos.x+ player.xflip_threshold*player.xflip{
 		player.xflip = 1
@@ -1884,7 +1897,7 @@ update_player :: proc() {
 	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
 
 	transform.pos += motion
-	update_sprite(transform = transform^, id = player.id)
+	update_sprite(transform = transform^, id = player.sprite_id)
 }
 
 
@@ -2105,6 +2118,7 @@ Cursor :: struct{
 	filename: cstring,
 	lookahead_distance: f32,
 	lookahead: f32,
+	sprite_id: Sprite_id,
 }
 
 init_cursor :: proc(){
@@ -2128,18 +2142,18 @@ init_cursor :: proc(){
 	//this makes cursor sizes consistant regardless of camera z pos (on init)
 	g.cursor.transform.size *= g.camera.position.zz
 
-	init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, id = "cursor", draw_priority = draw_layers.cursor)
+	g.cursor.sprite_id = init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, draw_priority = draw_layers.cursor)
 }
 
 update_cursor :: proc(){
-	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity * g.dt)
+	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity) * g.dt
 	check_cursor_collision()
 	g.cursor.world_transform = Transform{
 		pos = Vec2{g.camera.position.x - g.camera.camera_shake.pos_offset.x, g.camera.position.y - g.camera.camera_shake.pos_offset.y} + g.cursor.transform.pos,
 		size = g.cursor.transform.size,
 		rot = g.cursor.transform.rot,
 	}
-	update_sprite(transform = g.cursor.world_transform, id = "cursor")
+	update_sprite(transform = g.cursor.world_transform, id = g.cursor.sprite_id)
 }
 
 //check the cursor collision with the screen
