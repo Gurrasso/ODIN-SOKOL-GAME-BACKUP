@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	u32 sprite ids?
+
 	generate an image atlas on init with all the images instead of loading induvidual images?
 	fix sprites being wierd and having subpixel positions,
 
@@ -995,12 +997,13 @@ init_icon :: proc(imagefile: cstring){
 // =============
 
 Sprite_id :: string
+Null_sprite_id :: ""
 
 WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
 	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 }
 
@@ -1010,7 +1013,7 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -1040,7 +1043,7 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = "", tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
 	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
@@ -1051,7 +1054,7 @@ update_sprite :: proc{
 	update_sprite_image,
 }
 
-update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: string){
+update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: Sprite_id){
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
@@ -1065,7 +1068,7 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: s
 	}
 }
 
-update_sprite_image :: proc(img: sg.Image, id: string){
+update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
@@ -1079,7 +1082,7 @@ update_sprite_image :: proc(img: sg.Image, id: string){
 	}
 }
 
-update_sprite_transform :: proc(transform: Transform, id: string){
+update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 
 	assert(id in g.objects)
 
