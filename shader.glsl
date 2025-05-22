@@ -1,5 +1,5 @@
 // 
-//  TODO:
+//  TODO: figure out how to pass in screen_size as a uniform
 // 
 
 @header package main
@@ -16,6 +16,7 @@ in vec3 pos;
 in vec4 col;
 in vec2 uv;
 in vec4 bytes0;
+in vec2 scz;
 
 layout(binding=0) uniform vs_params {
 	mat4 mvp;
@@ -24,12 +25,14 @@ layout(binding=0) uniform vs_params {
 out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
+out vec2 screen_size;
 
 void main() {
 	gl_Position = mvp * vec4(pos, 1);
 	color = col;
 	texcoord = uv;
 	bytes = bytes0;
+	screen_size = scz;
 }
 
 @end
@@ -41,6 +44,7 @@ void main() {
 in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
+in vec2 screen_size;
 
 layout(binding=0) uniform texture2D tex;
 // sampler specifies things
@@ -64,9 +68,13 @@ void main() {
 		// this is text, it's only got the single .r channel so we stuff it into the alpha
 		tex_col.a = texture(sampler2D(tex, smp), texcoord).r;
 	}
+	
+
+	tex_col *= color;
 
 	frag_color = tex_col;
-	frag_color *= color;
+	
+
 }
 
 @end

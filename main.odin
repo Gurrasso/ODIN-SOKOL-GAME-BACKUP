@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	make the background thing a little more elegant,
+
 	u32 sprite ids?
 
 	generate an image atlas on init with all the images instead of loading induvidual images?
@@ -117,6 +119,7 @@ Vertex_data :: struct{
 	col: sg.Color,
 	uv: Vec2,
 	tex_index: u8,
+	scz: Vec2,
 }
 
 Vertex_buffer_data :: struct{
@@ -279,6 +282,7 @@ init_cb :: proc "c" (){
 			ATTR_main_col = { format = .FLOAT4 },
 			ATTR_main_uv = { format = .FLOAT2 },
 			ATTR_main_bytes0 = { format = .UBYTE4N },
+			ATTR_main_scz = { format = .FLOAT2 },
 			}
 		},
 		
@@ -752,10 +756,10 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 // checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
 	vertices := []Vertex_data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index	},
-		{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index	},
-		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index	},
-		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index	},
+		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+		{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
 	}
 	buffer: sg.Buffer
 	
@@ -1003,7 +1007,7 @@ WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default) -> string{
 	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 }
 
@@ -1013,7 +1017,7 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
+init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -1034,7 +1038,7 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 		vec2_to_vec3(transform.pos),
 		transform.rot,
 		img,
-		draw_priority,
+		auto_cast draw_priority,
 		vertex_buffer,
 	})
 
@@ -1043,7 +1047,7 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: i32 = draw_layers.default) -> string{
+init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default) -> string{
 	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
@@ -1099,33 +1103,18 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 
 //	DRAW_LAYERS
 
-//a struct that defines layers with different draw priority
-Draw_layers :: struct{
-	bottom: f32,
-	background: i32,
-	item: i32,
-	default: i32,
-	text: i32,
-	cursor: i32,
-	top: i32,
+//an enum that defines layers with different draw priority
+Draw_layers :: enum i32{
+	bottom = 0,
+	background = 1,
+	environment = 2,
+	item = 3,
+	default = 4,
+	text = 5,
+	cursor = 6,
+	top = 7,
 }
 
-draw_layers := Draw_layers{
-	//bottom layer
-	bottom = 0,
-	//background
-	background = 1,
-	//items
-	item = 2,
-	//default layer
-	default = 3,
-	//text layer
-	text = 4,
-	//cursor layer
-	cursor = 5,
-	//top layer
-	top = 6,
-}
 
 // TEX_INDICES
 
@@ -1172,7 +1161,7 @@ font_bitmap_h :: 256
 char_count :: 256
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: i32 = draw_layers.text, draw_from_center: bool = false) -> string{
+init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: Draw_layers = .text, draw_from_center: bool = false) -> string{
 	using stbtt
 
 	assert(font_id in g.fonts)
@@ -1244,7 +1233,7 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 
 	}
 
-	append_text_object(rotation, text_objects, text_object_id, pos, draw_priority, draw_from_center)
+	append_text_object(rotation, text_objects, text_object_id, pos, auto_cast draw_priority, draw_from_center)
 	
 	return text_object_id
 }
@@ -1463,7 +1452,7 @@ Item_data :: struct{
 
 init_item :: proc(transform: ^Transform, item_data: Item_data) -> Sprite_id{
 	transform.size = item_data.size
-	return init_sprite(item_data.img, transform^, "", draw_priority = draw_layers.item)
+	return init_sprite(item_data.img, transform^, "", draw_priority = .item)
 }
 
 update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: string){
@@ -1647,6 +1636,7 @@ give_item :: proc(holder: ^Item_holder, item_id: string){
 
 //game specific globals
 Game_state :: struct{
+	background_sprite: Sprite_id,
 	projectiles: [dynamic]Projectile,
 	cooldowns: map[Cooldown]Cooldown_object,
 }
@@ -1660,6 +1650,8 @@ test_text_id: string
 
 init_game_state :: proc(){
 	game_state = new(Game_state)
+
+	init_background({120, 120, 120})
 	
 	init_items()
 	
@@ -1674,15 +1666,17 @@ init_game_state :: proc(){
 	
 	test_text_id = init_text(text = "TÅST", draw_from_center = true, text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
 
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
-	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = draw_layers.background)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
+	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 
 	init_cursor()
 }
 
 update_game_state :: proc(){
+
+	update_background()
 
 	event_listener()
 
@@ -2109,8 +2103,19 @@ init_weapons :: proc(){
 }
 
 // ====================
-//   :CAMERA :CURSOR
+//   :CAMERA :CURSOR :BACKGROUND
 // ====================
+
+// BACKGROUND
+
+
+init_background :: proc(color: Vec3 = {255, 255, 255}){
+	game_state.background_sprite = init_rect(color = sg_color(color3 = color),  transform = Transform{size = {20, 20}}, draw_priority = .background)
+}
+
+update_background :: proc(){
+	update_sprite(transform = Transform{pos = Vec2{g.camera.position.x, g.camera.position.y}}, id = game_state.background_sprite)
+}
 
 // CURSOR
 
@@ -2145,7 +2150,7 @@ init_cursor :: proc(){
 	//this makes cursor sizes consistant regardless of camera z pos (on init)
 	g.cursor.transform.size *= g.camera.position.zz
 
-	g.cursor.sprite_id = init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, draw_priority = draw_layers.cursor)
+	g.cursor.sprite_id = init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, draw_priority = .cursor)
 }
 
 update_cursor :: proc(){
