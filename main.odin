@@ -351,11 +351,21 @@ cleanup_cb :: proc "c" (){
 	free(g)
 	free(rg)
 	free(game_state)
-	free_all()
 
+	free_all()
 
 	//shut down sokol graphics
 	sg.shutdown()
+}
+
+//var for keeping time since last fixed update
+time_since_fixed_update: f32
+// how often the fixed update function should try to update (it will only update as fast as the framerate)
+FIXED_UPDATE_TIME: f32 : 1/60
+
+//Every x seconds
+fixed_frame_cb :: proc(){
+	fixed_update_game_state()
 }
 
 //Every frame
@@ -370,6 +380,13 @@ frame_cb :: proc "c" (){
 
 	//deltatime
 	g.dt = f32(sapp.frame_duration())
+	time_since_fixed_update += g.dt
+
+	//fixed update
+	if time_since_fixed_update > FIXED_UPDATE_TIME{
+		fixed_frame_cb()
+		time_since_fixed_update = 0
+	}
 	
 	//updates
 	update_game_state()
@@ -1654,6 +1671,8 @@ init_game_state :: proc(){
 
 	init_background({110, 110, 110})
 	
+	
+
 	init_items()
 	
 	sapp.show_mouse(false)
@@ -1695,6 +1714,11 @@ update_game_state :: proc(){
 	mouse_move = {}
 	g.runtime += g.dt
 	g.frame_count += 1
+}
+
+//updates every x seconds
+fixed_update_game_state :: proc(){
+
 }
 
 //proc for quiting the game immediately, is called in the beginning of the frame if g.should_quit == true
