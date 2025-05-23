@@ -35,7 +35,8 @@ package main
 	
 	lighting(normalmaps),
 	antialiasing,
-	resolution scaling? maybe use the projection matrix to get the relation between coords and pixels? or try and change the dpi/res with sokol?,
+	resolution scaling? or try and change the dpi/res with sokol?,
+	maybe use the projection matrix to get the relation between coords and pixels?,
 	fix init_icon,
 
 
@@ -1651,7 +1652,7 @@ test_text_id: string
 init_game_state :: proc(){
 	game_state = new(Game_state)
 
-	init_background({120, 120, 120})
+	init_background({110, 110, 110})
 	
 	init_items()
 	
@@ -1675,7 +1676,6 @@ init_game_state :: proc(){
 }
 
 update_game_state :: proc(){
-
 	update_background()
 
 	event_listener()

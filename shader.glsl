@@ -73,8 +73,6 @@ void main() {
 	tex_col *= color;
 
 	frag_color = tex_col;
-	
-
 }
 
 @end
