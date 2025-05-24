@@ -17,7 +17,7 @@ package main
 	fix small characters like .,: having the wrong spacing,
 	maybe add .CORNER, .CENTER etc, for text alignment,
 
-	add updating of vertex_buffers,
+	fix updating of vertex_buffers,
 	
 	make it so item holders can hold nothing,
 	weapons dont work for multiple enteties at a time,
@@ -34,7 +34,7 @@ package main
 	tilemap and other environment/map things,
 	
 	lighting(normalmaps),
-	antialiasing,
+	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
 	maybe use the projection matrix to get the relation between coords and pixels?,
 	fix init_icon,
@@ -148,6 +148,7 @@ Object :: struct{
 	img: sg.Image,
 	draw_priority: i32,
 	vertex_buffer: sg.Buffer,
+	size: Vec2,
 }
 
 Transform :: struct{
@@ -233,6 +234,7 @@ main :: proc(){
 		width	= 1000,
 		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
+		sample_count = 8,
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
@@ -325,6 +327,7 @@ init_cb :: proc "c" (){
 	rg.sampler = sg.make_sampler({})
 
 	init_game_state()
+
 }
 
 
@@ -792,18 +795,47 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_ind
 			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
 		}
 		buffer = sg.make_buffer({ data = sg_range(vertices)})
-		append(&g.vertex_buffers, Vertex_buffer_data{
+
+		buffer_data := Vertex_buffer_data{
 			buffer = buffer,
 			uv_data = uvs,
 			size_data = size,
 			color_data = color_offset,
 			tex_index_data = tex_index,
-		})
+		}
+		append(&g.vertex_buffers, buffer_data)
 	}
 
 	return buffer
 }
 
+
+//currently broken for some reason
+update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
+	exists: bool
+
+	for &buffer_data in g.vertex_buffers{
+		if buffer_data.buffer == buffer{
+			color_offset := buffer_data.color_data
+			uvs := buffer_data.uv_data
+			tex_index := buffer_data.tex_index_data
+			buffer_data.size_data = size
+
+			vertices := []Vertex_data {
+				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+			}
+
+			sg.update_buffer(buffer, sg_range(vertices))
+
+			exists = true
+		}
+	}
+
+	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_size")
+}
 
 //key press utils
 
@@ -1038,7 +1070,7 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 		id = generate_string_id()
 	}
 
-	vertex_buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
+	buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
 
 	if id in g.objects == false{
 		g.objects[id] = Object_group{}
@@ -1051,7 +1083,8 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 		transform.rot,
 		img,
 		auto_cast draw_priority,
-		vertex_buffer,
+		buffer,
+		transform.size,
 	})
 
 	return id
@@ -1080,6 +1113,7 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: S
 			img,
 			object.draw_priority,
 			object.vertex_buffer,
+			object.size,
 		}
 	}
 }
@@ -1088,12 +1122,14 @@ update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
+
 		object = Object{
 			object.pos,
 			object.rot,
 			img,
 			object.draw_priority,
 			object.vertex_buffer,
+			object.size,
 		}
 	}
 }
@@ -1103,13 +1139,29 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
+
 		object = Object{
 			vec2_to_vec3(transform.pos),
 			transform.rot,
 			object.img,
 			object.draw_priority,
 			object.vertex_buffer,
+			object.size,
 		}
+	}
+}
+
+update_sprite_size :: proc(size: Vec2, id: Sprite_id){
+
+	assert(id in g.objects)
+
+	for &object in g.objects[id].objects{
+		//update the vertex buffer
+		if object.size != size{
+			update_vertex_buffer_size(object.vertex_buffer, size)
+		}
+
+		object.size = size
 	}
 }
 
@@ -1676,9 +1728,7 @@ test_text_id: string
 init_game_state :: proc(){
 	game_state = new(Game_state)
 
-	init_background({110, 110, 110})
-	
-	
+	init_background({112, 112, 112})
 
 	init_items()
 	
@@ -1714,7 +1764,7 @@ update_game_state :: proc(){
 	update_camera()
 
 	update_cursor()
-
+	
 	test_text_rot -= test_text_rot_speed * g.dt
 	update_text(test_text_rot, test_text_id)
 
@@ -1725,7 +1775,7 @@ update_game_state :: proc(){
 
 //updates every x seconds
 fixed_update_game_state :: proc(){
-	log.debug(len(g.vertex_buffers))
+	
 }
 
 //proc for quiting the game immediately, is called in the beginning of the frame if g.should_quit == true
