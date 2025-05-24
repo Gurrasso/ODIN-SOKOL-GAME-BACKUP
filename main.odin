@@ -9,7 +9,9 @@ package main
 	u32 sprite ids?
 
 	generate an image atlas on init with all the images instead of loading induvidual images?
-	fix sprites being wierd and having subpixel positions,
+	fix sprites being wierd and having subpixel positions, automatically get the size of sprites based off off the amount of pixels in the img,
+	
+	UI system
 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
@@ -24,8 +26,6 @@ package main
 	
 	make sure everything that should use the transform struct uses it,
 	make sure we use the same naming for pos, rot etc everywhere,
-
-	automatically give sprite ids instead of having to assign them manually,
 
 	sprite sheet rendering,
 	animation system thing?,
@@ -157,7 +157,7 @@ Transform :: struct{
 	size: Vec2,
 }
 
-DEFAULT_TRANSFORM: Transform = {
+DEFAULT_TRANSFORM: Transform : {
 	size = {0.5, 0.5},
 	pos = {0, 0},
 	rot = {0, 0, 0}
@@ -235,6 +235,7 @@ main :: proc(){
 		height = 1000,
 		window_title = "ODIN-SOKOL-GAME",
 		sample_count = 8,
+
 
 		allocator = sapp.Allocator(shelpers.allocator(&default_context)),
 		logger = sapp.Logger(shelpers.logger(&default_context)),
