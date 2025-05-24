@@ -773,30 +773,24 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 
 // checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
 get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
-	vertices := []Vertex_data {
-		{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-		{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-		{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-		{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-	}
+	
 	buffer: sg.Buffer
 	
 	buffer_exists: bool = false
 	for vertex_buffer in g.vertex_buffers{
-		same_buffer_data := true
-		if vertex_buffer.uv_data != uvs do same_buffer_data = false
-		if vertex_buffer.size_data != size do same_buffer_data = false
-		if vertex_buffer.color_data != color_offset do same_buffer_data = false
-		if vertex_buffer.tex_index_data != tex_index do same_buffer_data = false
-
+		if vertex_buffer.uv_data != uvs || vertex_buffer.size_data != size || vertex_buffer.color_data != color_offset || vertex_buffer.tex_index_data != tex_index do continue
 		
-		if same_buffer_data{
-			buffer_exists = true
-			buffer = vertex_buffer.buffer
-			break
-		}
+		buffer_exists = true
+		buffer = vertex_buffer.buffer
+		break
 	}
 	if !buffer_exists{
+		vertices := []Vertex_data {
+			{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+			{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+		}
 		buffer = sg.make_buffer({ data = sg_range(vertices)})
 		append(&g.vertex_buffers, Vertex_buffer_data{
 			buffer = buffer,
@@ -1731,7 +1725,7 @@ update_game_state :: proc(){
 
 //updates every x seconds
 fixed_update_game_state :: proc(){
-
+	log.debug(len(g.vertex_buffers))
 }
 
 //proc for quiting the game immediately, is called in the beginning of the frame if g.should_quit == true
