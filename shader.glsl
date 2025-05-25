@@ -1,5 +1,5 @@
 // 
-//  TODO: figure out how to pass in screen_size as a uniform
+//  TODO: 
 // 
 
 @header package main
@@ -16,11 +16,13 @@ in vec3 pos;
 in vec4 col;
 in vec2 uv;
 in vec4 bytes0;
-in vec2 scz;
 
-layout(binding=0) uniform vs_params {
+layout(binding=0) uniform Uniforms_Data {
 	mat4 mvp;
+	vec2 scz;
 };
+
+
 
 out vec4 color;
 out vec2 texcoord;

@@ -32,7 +32,8 @@ package main
 	collisions,
 	
 	tilemap and other environment/map things,
-	
+	map generation with wave function collapse,
+
 	lighting(normalmaps),
 	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
@@ -114,13 +115,17 @@ Asympatic_object :: struct{
 	destination: Vec2,
 }
 
+Uniforms_vs_data :: struct{
+	mvp: Mat4,
+	scz: Vec2,
+}
+
 // the vertex data
 Vertex_data :: struct{
 	pos: Vec3,
 	col: sg.Color,
 	uv: Vec2,
 	tex_index: u8,
-	scz: Vec2,
 }
 
 Vertex_buffer_data :: struct{
@@ -286,7 +291,6 @@ init_cb :: proc "c" (){
 			ATTR_main_col = { format = .FLOAT4 },
 			ATTR_main_uv = { format = .FLOAT2 },
 			ATTR_main_bytes0 = { format = .UBYTE4N },
-			ATTR_main_scz = { format = .FLOAT2 },
 			}
 		},
 		
@@ -326,6 +330,8 @@ init_cb :: proc "c" (){
 
 	//create the sampler
 	rg.sampler = sg.make_sampler({})
+
+
 
 	init_game_state()
 
@@ -464,10 +470,14 @@ frame_cb :: proc "c" (){
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
 
+
 		//apply uniforms
-		sg.apply_uniforms(UB_vs_params, sg_range(&Vs_Params{
-			mvp = p * v * drt.m
+		sg.apply_uniforms(UB_Uniforms_Data, sg_range(&Uniforms_vs_data{
+			mvp = p * v * drt.m,
+			scz = Vec2{sapp.widthf(), sapp.heightf()},
 		}))
+
+
 
 		//drawing
 		sg.draw(0, 6, 1)
@@ -790,12 +800,13 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_ind
 	}
 	if !buffer_exists{
 		vertices := []Vertex_data {
-			{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-			{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+			{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index},
+			{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
+			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
+			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
 		}
-		buffer = sg.make_buffer({ data = sg_range(vertices)})
+		buffer = sg.alloc_buffer()
+		sg.init_buffer(buffer, { data = sg_range(vertices)})
 
 		buffer_data := Vertex_buffer_data{
 			buffer = buffer,
@@ -823,10 +834,10 @@ update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
 			buffer_data.size_data = size
 
 			vertices := []Vertex_data {
-				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
-				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index, scz = Vec2{sapp.widthf(), sapp.heightf()} },
+				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index },
+				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
+				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
+				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
 			}
 
 			sg.update_buffer(buffer, sg_range(vertices))
@@ -2527,14 +2538,13 @@ update_camera_shake :: proc(){
 		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
 
 		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
-		cs.pos_offset /= 50
+		cs.pos_offset /= 45
 		cs.pos_offset *= cs.trauma * cs.trauma
 		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
 		cs.rot_offset /= 100
 		cs.rot_offset *= cs.trauma * cs.trauma * cs.trauma
 
 		cs.trauma -= cs.depletion * g.dt
-		if cs.trauma < 0 do cs.trauma = 0
 	}
 }
 
