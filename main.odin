@@ -479,7 +479,6 @@ frame_cb :: proc "c" (){
 		}))
 
 
-
 		//drawing
 		sg.draw(0, 6, 1)
 	}

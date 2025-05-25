@@ -56,6 +56,7 @@ out vec4 frag_color;
 
 void main() {
 
+
 	// unflips the images
 	vec2 new_texcoord = texcoord;
 	new_texcoord.y = 1 - new_texcoord.y;
