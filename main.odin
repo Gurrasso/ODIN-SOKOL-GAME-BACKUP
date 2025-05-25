@@ -37,7 +37,7 @@ package main
 	lighting(normalmaps),
 	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
-	maybe use the projection matrix to get the relation between coords and pixels?,
+	maybe use mvp to get the relation between coords and pixels?,
 	fix init_icon,
 
 
@@ -113,11 +113,6 @@ Asympatic_object :: struct{
 	depletion: f32,
 	position: Vec2,
 	destination: Vec2,
-}
-
-Uniforms_vs_data :: struct{
-	mvp: Mat4,
-	scz: Vec2,
 }
 
 // the vertex data
@@ -213,6 +208,12 @@ Rendering_globals :: struct {
 	index_buffer: sg.Buffer,	
 	sampler: sg.Sampler,
 }
+
+Uniforms_vs_data :: struct{
+	mvp: Mat4,
+	scz: Vec2,
+}
+
 
 rg: ^Rendering_globals
 
