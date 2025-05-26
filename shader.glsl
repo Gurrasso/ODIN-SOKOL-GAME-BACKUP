@@ -20,6 +20,7 @@ in vec4 bytes0;
 layout(binding=0) uniform Uniforms_Data {
 	mat4 mvp;
 	vec2 scz;
+	mat4 screen_to_world;
 };
 
 
@@ -30,7 +31,7 @@ out vec4 bytes;
 out vec2 screen_size;
 
 void main() {
-	gl_Position = mvp * vec4(pos, 1);
+	gl_Position = mvp*vec4(pos, 1);
 	color = col;
 	texcoord = uv;
 	bytes = bytes0;
@@ -55,7 +56,6 @@ layout(binding=0) uniform sampler smp;
 out vec4 frag_color; 
 
 void main() {
-
 
 	// unflips the images
 	vec2 new_texcoord = texcoord;

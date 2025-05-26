@@ -183,6 +183,7 @@ Globals :: struct {
 	// Game state stuff
 	should_quit: bool,
 	runtime: f32,
+	screen_size: Vec2,
 	frame_count: i32,
 	dt: f32,
 	//Objects for drawing
@@ -212,6 +213,7 @@ Rendering_globals :: struct {
 Uniforms_vs_data :: struct{
 	mvp: Mat4,
 	scz: Vec2,
+	screen_to_world: Mat4,
 }
 
 
@@ -279,7 +281,7 @@ init_cb :: proc "c" (){
 	//white image for scuffed rect rendering
 	WHITE_IMAGE = get_image(WHITE_IMAGE_PATH)
 
-
+	g.screen_size = {sapp.widthf(), sapp.heightf()}
 
 	//make the shader and pipeline
 	rg.shader = sg.make_shader(main_shader_desc(sg.query_backend()))
@@ -398,6 +400,7 @@ frame_cb :: proc "c" (){
 		fixed_frame_cb()
 		time_since_fixed_update = 0
 	}
+
 	
 	//updates
 	update_game_state()
@@ -471,15 +474,13 @@ frame_cb :: proc "c" (){
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
 
-
 		//apply uniforms
 		sg.apply_uniforms(UB_Uniforms_Data, sg_range(&Uniforms_vs_data{
-			mvp = p * v * drt.m,
-			scz = Vec2{sapp.widthf(), sapp.heightf()},
+			mvp = p*v*drt.m,
+			scz = g.screen_size,
+			screen_to_world = v*linalg.inverse(drt.m),
 		}))
 
-
-		//drawing
 		sg.draw(0, 6, 1)
 	}
 
@@ -529,6 +530,8 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 			mouse_down[ev.mouse_button] = false
 
 			single_mouse_down[ev.mouse_button] = false
+		case .RESIZED:
+			g.screen_size = Vec2{sapp.widthf(), sapp.heightf()}
 
 
 	}
@@ -1051,6 +1054,10 @@ init_icon :: proc(imagefile: cstring){
 	}
 	sapp.set_icon(icon_desc)
 }
+
+
+
+
 
 // =============
 //   :DRAWING
@@ -1764,7 +1771,6 @@ init_game_state :: proc(){
 }
 
 update_game_state :: proc(){
-	update_background()
 
 	event_listener()
 
