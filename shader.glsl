@@ -52,6 +52,11 @@ void main() {
 // :FRAGMENT SHADER
 
 @fs fs
+
+//Utils
+
+@include shader_utils.glsl
+
 // vars
 in vec4 color;
 in vec2 texcoord;
@@ -87,13 +92,13 @@ void main() {
 	tex_col *= color;
 
 	float dist = length(gl_FragCoord.xy-light.xy);
-	vec3 lightColor = vec3(1.0, 0.8, 0.6);
-	float lightRadius = 1000; // in screen pixels
+	vec3 lightColor = rgb_to_sg_color(vec3(253, 255, 199));
+	float lightRadius = 400; // in screen pixels
 
 	float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
   attenuation = pow(attenuation, 2.0);
 
-	tex_col += vec4(lightColor * attenuation, 0);
+	tex_col += vec4((lightColor) * attenuation, 0);
 	
 
 	frag_color = tex_col;
