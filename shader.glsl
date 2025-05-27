@@ -18,9 +18,10 @@ in vec2 uv;
 in vec4 bytes0;
 
 layout(binding=0) uniform Uniforms_Data {
-	mat4 mvp;
+	mat4 model_matrix;
+	mat4 view_matrix;
+	mat4 projection_matrix;
 	vec2 scz;
-	mat4 screen_to_world;
 };
 
 
@@ -29,13 +30,21 @@ out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
 out vec2 screen_size;
+out vec2 light;
 
 void main() {
+	//model_view_projection matrix for the objects
+	mat4 mvp = projection_matrix*view_matrix*model_matrix;
 	gl_Position = mvp*vec4(pos, 1);
 	color = col;
 	texcoord = uv;
 	bytes = bytes0;
 	screen_size = scz;
+
+	vec4 clippos = ((projection_matrix*view_matrix) * vec4(1, 2, 0, 1));
+	vec2 ndcpos = vec2(clippos.x/clippos.w, -clippos.y/ clippos.w);
+	light = (ndcpos.xy*0.5+0.5)*scz;
+
 }
 
 @end
@@ -48,6 +57,7 @@ in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
 in vec2 screen_size;
+in vec2 light;
 
 layout(binding=0) uniform texture2D tex;
 // sampler specifies things
@@ -75,6 +85,16 @@ void main() {
 	}
 
 	tex_col *= color;
+
+	float dist = length(gl_FragCoord.xy-light.xy);
+	vec3 lightColor = vec3(1.0, 0.8, 0.6);
+	float lightRadius = 1000; // in screen pixels
+
+	float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
+  attenuation = pow(attenuation, 2.0);
+
+	tex_col += vec4(lightColor * attenuation, 0);
+	
 
 	frag_color = tex_col;
 }

@@ -211,9 +211,10 @@ Rendering_globals :: struct {
 }
 
 Uniforms_vs_data :: struct{
-	mvp: Mat4,
+	model_matrix: Mat4,
+	veiw_matrix: Mat4,
+	projection_matrix: Mat4,
 	scz: Vec2,
-	screen_to_world: Mat4,
 }
 
 
@@ -476,9 +477,10 @@ frame_cb :: proc "c" (){
 
 		//apply uniforms
 		sg.apply_uniforms(UB_Uniforms_Data, sg_range(&Uniforms_vs_data{
-			mvp = p*v*drt.m,
+			model_matrix = drt.m,
+			veiw_matrix = v,
+			projection_matrix = p,
 			scz = g.screen_size,
-			screen_to_world = v*linalg.inverse(drt.m),
 		}))
 
 		sg.draw(0, 6, 1)
@@ -1771,6 +1773,7 @@ init_game_state :: proc(){
 }
 
 update_game_state :: proc(){
+	update_background();
 
 	event_listener()
 
