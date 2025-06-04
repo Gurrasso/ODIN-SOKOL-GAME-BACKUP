@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	FIX shader ndc coords having an inverted y on linux,
+
 	make the background thing a little more elegant,
 
 	u32 sprite ids?
