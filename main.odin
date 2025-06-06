@@ -4,9 +4,9 @@ package main
 /*
 	TODO: 
 
-	FIX shader ndc coords having an inverted y on linux,
+	FIX shader coords having an inverted y on linux,
 
-	make the background thing a little more elegant,
+	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
 
 	u32 sprite ids?
 
@@ -30,7 +30,7 @@ package main
 	make sure we use the same naming for pos, rot etc everywhere,
 
 	sprite sheet rendering,
-	animation system thing?,
+	animation system with a sprite_animation object with different functions to toggle animations,
 	collisions,
 	
 	tilemap and other environment/map things,
@@ -39,7 +39,6 @@ package main
 	lighting(normalmaps),
 	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
-	maybe use mvp to get the relation between coords and pixels?,
 	fix init_icon,
 
 
@@ -155,7 +154,7 @@ Object :: struct{
 
 Transform :: struct{
 	pos: Vec2,
-	rot: Vec3,
+	rot: Vec3, // in degrees for sprites
 	size: Vec2,
 }
 
@@ -337,10 +336,7 @@ init_cb :: proc "c" (){
 	//create the sampler
 	rg.sampler = sg.make_sampler({})
 
-
-
 	init_game_state()
-
 }
 
 
@@ -394,6 +390,8 @@ frame_cb :: proc "c" (){
 		return
 	}
 
+	if screen_resized do g.screen_size = Vec2{sapp.widthf(), sapp.heightf()}
+
 	//deltatime
 	g.dt = f32(sapp.frame_duration())
 	time_since_fixed_update += g.dt
@@ -407,13 +405,15 @@ frame_cb :: proc "c" (){
 	
 	//updates
 	update_game_state()
+
+	if listen_screen_resized() do screen_resized = false
 	
 	//
 	// rendering	
 	//
 
-	//	projection matrix(turns normal coords to screen coords)
-	p := linalg.matrix4_perspective_f32(70, sapp.widthf() / sapp.heightf(), 0.0001, 1000)
+	//projection matrix
+	p := linalg.matrix4_perspective_f32(70, g.screen_size.x / g.screen_size.y, 0.0001, 1000)
 	//view matrix
 	v := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {g.camera.rotation, 1, 0})
 
@@ -427,9 +427,9 @@ frame_cb :: proc "c" (){
 	//do things for all text objects
 	for id in g.text_objects {
 		for obj in g.text_objects[id].objects{
-			//matrix
 
 			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
+			//model matrix turns vertex positions into world space positions
 			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 	
@@ -452,7 +452,8 @@ frame_cb :: proc "c" (){
 	//do things for all objects
 	for id in g.objects {
 		for obj in g.objects[id].objects{
-			//matrix
+			
+			//model matrix turns vertex positions into world space positions
 			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 			//apply the bindings(something that says which things we want to draw)
@@ -535,9 +536,7 @@ event_cb :: proc "c" (ev: ^sapp.Event){
 
 			single_mouse_down[ev.mouse_button] = false
 		case .RESIZED:
-			g.screen_size = Vec2{sapp.widthf(), sapp.heightf()}
-
-
+			screen_resized = true
 	}
 }
 
@@ -627,6 +626,7 @@ single_key_down: #sparse[sapp.Keycode]bool
 mouse_down: #sparse[sapp.Mousebutton]bool
 single_mouse_down: #sparse[sapp.Mousebutton]bool
 single_mouse_up: #sparse[sapp.Mousebutton]bool
+screen_resized: bool
 
 
 
@@ -764,6 +764,60 @@ contains :: proc(array: $T, target: $T1) -> bool{
 	return is
 }
 
+// Intersect a ray with a plane Z = target_z
+ray_plane_intersect_z :: proc(ray_origin, ray_dir: Vec3, target_z: f32) -> Vec3 {
+    t := (target_z - ray_origin.z) / ray_dir.z;
+    return ray_origin + ray_dir * t
+}
+
+//convert a point on the screen at a certain z pos to a world pos
+screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
+
+	viewport := Vec4{0.0, 0.0, g.screen_size.x, g.screen_size.y}
+
+//projection matrix
+	projection_matrix := linalg.matrix4_perspective_f32(70, g.screen_size.x / g.screen_size.y, 0.0001, 1000)
+	//view matrix
+	view_matrix := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {g.camera.rotation, 1, 0})
+
+
+	//Convert pixel to NDC
+	ndc_x := 2.0 * (point.x - viewport.x) / viewport.z - 1.0;
+	ndc_y := 2.0 * (point.y - viewport.y) / viewport.w - 1.0;
+
+	//Unproject near (depth = 0.0) and far (depth = 1.0) points
+	ndc_near := Vec4{ndc_x, ndc_y, -1.0, 1.0}; // Near plane
+	ndc_far  := Vec4{ndc_x, ndc_y,  1.0, 1.0}; // Far plane
+
+  inv_proj := linalg.inverse(projection_matrix)
+	inv_view := linalg.inverse(view_matrix)
+
+	eye_near := inv_proj * ndc_near
+	eye_far  := inv_proj * ndc_far
+
+	eye_near /= eye_near.w
+	eye_far  /= eye_far.w
+
+	world_near := inv_view * eye_near
+	world_far  := inv_view * eye_far
+
+	world_near /= world_near.w
+	world_far  /= world_far.w
+
+	//Make ray and intersect with Z plane
+	ray_origin := world_near.xyz
+	ray_dir := linalg.normalize(world_far.xyz - world_near.xyz)
+
+	return ray_plane_intersect_z(ray_origin, ray_dir, target_z).xyz
+}
+
+//get the screen size in world coords at a certain z pos
+get_screen_size_in_world :: proc(target_z: f32) -> Vec2{
+	top_left := Vec2{0, 0}
+	bottom_right := g.screen_size-1
+	
+	return screen_point_to_world_at_z(bottom_right, target_z).xy - screen_point_to_world_at_z(top_left, target_z).xy
+}
 
 // will return 0 if element isnt found
 get_index :: proc(array: $T, target: $T1) -> int{
@@ -793,7 +847,11 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 
 
 // checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
-get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_index: u8) -> sg.Buffer{
+get_vertex_buffer :: proc(
+	size: Vec2, 
+	color_offset: sg.Color, 
+	uvs: Vec4, tex_index: u8
+) -> sg.Buffer{
 	
 	buffer: sg.Buffer
 	
@@ -812,8 +870,8 @@ get_vertex_buffer :: proc(size: Vec2, color_offset: sg.Color, uvs: Vec4, tex_ind
 			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
 			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
 		}
-		buffer = sg.alloc_buffer()
-		sg.init_buffer(buffer, { data = sg_range(vertices)})
+		buffer = sg.make_buffer({size = sg_range(vertices).size, usage = .DYNAMIC})
+		sg.update_buffer(buffer, data = sg_range(vertices))
 
 		buffer_data := Vertex_buffer_data{
 			buffer = buffer,
@@ -856,41 +914,32 @@ update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
 	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_size")
 }
 
+// EVENT UTILS (dont really need all of these procs but it makes it a bit more intuitive)
+
 //key press utils
 
 listen_key_single_up :: proc(keycode: sapp.Keycode) -> bool{
 	if single_key_up[keycode] {
 		single_key_up[keycode] = false
 		return true	
-	} else{
-		return false
-	}
+	} else do return false
 }
 
 listen_key_single_down :: proc(keycode: sapp.Keycode) -> bool{
 	if single_key_down[keycode] {
 		single_key_down[keycode] = false
 		return true	
-	} else{
-		return false
-	}
-
+	} else do return false
 }
 
 listen_key_down :: proc(keycode: sapp.Keycode) -> bool{
-	if key_down[keycode] {
-		return true	
-	} else{
-		return false
-	}
+	if key_down[keycode] do return true	
+	else do return false
 }
 
 listen_key_up :: proc(keycode: sapp.Keycode) -> bool{
-	if !key_down[keycode] {
-		return true	
-	} else{
-		return false
-	}
+	if !key_down[keycode] do return true	
+	else do return false
 }
 
 
@@ -900,35 +949,30 @@ listen_mouse_single_up :: proc(Mousebutton: sapp.Mousebutton) -> bool{
 	if single_mouse_up[Mousebutton] {
 		single_mouse_up[Mousebutton] = false
 		return true	
-	} else{
-		return false
-	}
+	} else do return false
 }
 
 listen_mouse_single_down :: proc(Mousebutton: sapp.Mousebutton) -> bool{
 	if single_mouse_down[Mousebutton] {
 		single_mouse_down[Mousebutton] = false
 		return true	
-	} else{
-		return false
-	}
-
+	} else do return false
 }
 
 listen_mouse_down :: proc(Mousebutton: sapp.Mousebutton) -> bool{
-	if mouse_down[Mousebutton] {
-		return true	
-	} else{
-		return false
-	}
+	if mouse_down[Mousebutton] do return true	
+	else do return false
 }
 
 listen_mouse_up :: proc(Mousebutton: sapp.Mousebutton) -> bool{
-	if !mouse_down[Mousebutton] {
-		return true	
-	} else{
-		return false
-	}
+	if !mouse_down[Mousebutton] do return true	
+	else do return false
+}
+
+//checks if the screen has been resized and returns a bool
+listen_screen_resized :: proc() -> bool{
+	if screen_resized do return true
+	else do return false
 }
 
 //xform utils
@@ -1074,7 +1118,12 @@ WHITE_IMAGE_PATH : cstring = "./src/assets/textures/WHITE_IMAGE.png"
 WHITE_IMAGE : sg.Image
 
 //kinda scuffed but works
-init_rect :: proc(color: sg.Color = { 1,1,1,1 }, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default) -> string{
+init_rect :: proc(
+	color: sg.Color = { 1,1,1,1 }, 
+	transform: Transform = DEFAULT_TRANSFORM, 
+	id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, 
+	draw_priority: Draw_layers = .default
+) -> string{
 	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
 }
 
@@ -1084,7 +1133,14 @@ init_sprite :: proc{
 	init_sprite_from_img,
 }
 
-init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default, color_offset: sg.Color = { 1,1,1,1 }) -> string{
+init_sprite_from_img :: proc(
+	img: sg.Image, 
+	transform: Transform = DEFAULT_TRANSFORM, 
+	id: Sprite_id = Null_sprite_id, tex_index: 
+	u8 = tex_indices.default, 
+	draw_priority: Draw_layers = .default, 
+	color_offset: sg.Color = { 1,1,1,1 }
+) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
@@ -1115,7 +1171,13 @@ init_sprite_from_img :: proc(img: sg.Image, transform: Transform = DEFAULT_TRANS
 
 
 //proc for creating a new sprite on the screen and adding it to the objects
-init_sprite_from_filename :: proc(filename: cstring, transform: Transform = DEFAULT_TRANSFORM, id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, draw_priority: Draw_layers = .default) -> string{
+init_sprite_from_filename :: proc(
+	filename: cstring, 
+	transform: Transform = DEFAULT_TRANSFORM, 
+	id: Sprite_id = Null_sprite_id, 
+	tex_index: u8 = tex_indices.default, 
+	draw_priority: Draw_layers = .default
+) -> string{
 	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
 }
 
@@ -1248,7 +1310,17 @@ font_bitmap_h :: 256
 char_count :: 256
 
 //initiate the text and add it to our objects to draw it to screen
-init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, text: string, font_id: string, text_object_id: string = "text", text_rot : f32 = 0, draw_priority: Draw_layers = .text, draw_from_center: bool = false) -> string{
+init_text :: proc(
+	pos: Vec2, 
+	scale: f32 = 0.05, 
+	color: sg.Color = { 1,1,1,1 }, 
+	text: string, 
+	font_id: string, 
+	text_object_id: string = "text", 
+	text_rot : f32 = 0, 
+	draw_priority: Draw_layers = .text, 
+	draw_from_center: bool = false
+) -> string{
 	using stbtt
 
 	assert(font_id in g.fonts)
@@ -1320,12 +1392,25 @@ init_text :: proc(pos: Vec2, scale: f32 = 0.05, color: sg.Color = { 1,1,1,1 }, t
 
 	}
 
-	append_text_object(rotation, text_objects, text_object_id, pos, auto_cast draw_priority, draw_from_center)
+	append_text_object(
+		rotation, 
+		text_objects, 
+		text_object_id, pos, 
+		auto_cast draw_priority, 
+		draw_from_center
+	)
 	
 	return text_object_id
 }
 
-append_text_object :: proc(rot: Vec3, text_objects: [dynamic]Char_object, text_object_id: string, text_pos: Vec2, draw_priority: i32, draw_from_center: bool){
+append_text_object :: proc(
+	rot: Vec3, 
+	text_objects: [dynamic]Char_object, 
+	text_object_id: string, 
+	text_pos: Vec2, 
+	draw_priority: i32, 
+	draw_from_center: bool
+){
 	text_center : Vec2
 	text_rot : Vec3 = rot
 
@@ -1399,7 +1484,13 @@ init_font :: proc(font_path: string, font_h: i32 = 16, id: string) {
 }
 
 //stores font data in g.fonts
-store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count]stbtt.bakedchar, font_id: string){
+store_font :: proc(
+	w: int, 
+	h: int, 
+	sg_img: sg.Image, 
+	font_char_data: [char_count]stbtt.bakedchar, 
+	font_id: string
+){
 	assert(font_id in g.fonts == false)
 
 	g.fonts[font_id] = FONT_INFO{
@@ -1412,7 +1503,14 @@ store_font :: proc(w: int, h: int, sg_img: sg.Image, font_char_data: [char_count
 }
 
 //generate the Char_object
-generate_char_object :: proc(pos2: Vec2, size: Vec2, text_uv: Vec4, color_offset: sg.Color , img: sg.Image, tex_index: u8 = tex_indices.text) -> Char_object{
+generate_char_object :: proc(
+	pos2: Vec2, 
+	size: Vec2, 
+	text_uv: Vec4, 
+	color_offset: sg.Color , 
+	img: sg.Image, 
+	tex_index: u8 = tex_indices.text
+) -> Char_object{
 
 	// vertices
 	vertex_buffer := get_vertex_buffer(size, color_offset, text_uv, tex_index)
@@ -1653,7 +1751,12 @@ update_projectile :: proc(projectile: ^Projectile){
 }
 
 //init a projectile
-init_projectile :: proc(projectile_data: Projectile, shoot_pos: Vec2, dir: Vec2, sprite_id: string){
+init_projectile :: proc(
+	projectile_data: Projectile, 
+	shoot_pos: Vec2, 
+	dir: Vec2, 
+	sprite_id: string
+){
 	append(&game_state.projectiles, projectile_data)
 	projectile := &game_state.projectiles[len(game_state.projectiles)-1]
 	transform := &projectile.transform
@@ -1704,7 +1807,11 @@ init_item_holder :: proc(holder: ^Item_holder){
 
 
 //update the item holder and check for certain tags
-update_item_holder :: proc(holder: Item_holder, look_dir: Vec2 = {1, 0}, shoot_pos: Vec2 = {0, 0}){
+update_item_holder :: proc(
+	holder: Item_holder, 
+	look_dir: Vec2 = {1, 0}, 
+	shoot_pos: Vec2 = {0, 0}
+){
 	//the players item
 	item := holder.item
 	#partial switch tag2 := item.tags[get_next_index(item.tags, Entity_tags.Item)]; tag2{
@@ -1751,8 +1858,6 @@ test_text_id: string
 init_game_state :: proc(){
 	game_state = new(Game_state)
 
-	init_background({112, 112, 112})
-
 	init_items()
 	
 	sapp.show_mouse(false)
@@ -1764,7 +1869,15 @@ init_game_state :: proc(){
 
 	init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
-	test_text_id = init_text(text = "TÅST", draw_from_center = true, text_rot = test_text_rot, pos = {0, 1}, scale = 0.03, color = sg_color(color3 = Vec3{138,43,226}), font_id = "font1")
+	test_text_id = init_text(
+		text = "TÅST", 
+		draw_from_center = true, 
+		text_rot = test_text_rot, 
+		pos = {0, 1}, 
+		scale = 0.03, 
+		color = sg_color(color3 = Vec3{138,43,226}), 
+		font_id = "font1"
+	)
 
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
@@ -1772,10 +1885,11 @@ init_game_state :: proc(){
 	init_rect(color = sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 
 	init_cursor()
+
+	init_background({112, 112, 112})
 }
 
 update_game_state :: proc(){
-	update_background();
 
 	event_listener()
 
@@ -1790,6 +1904,9 @@ update_game_state :: proc(){
 	
 	test_text_rot -= test_text_rot_speed * g.dt
 	update_text(test_text_rot, test_text_id)
+
+
+	update_background();
 
 	mouse_move = {}
 	g.runtime += g.dt
@@ -2214,11 +2331,23 @@ init_weapons :: proc(){
 
 
 init_background :: proc(color: Vec3 = {255, 255, 255}){
-	game_state.background_sprite = init_rect(color = sg_color(color3 = color),  transform = Transform{size = {20, 20}}, draw_priority = .background)
+	game_state.background_sprite = init_rect(
+		color = sg_color(color3 = color),  
+		transform = Transform{size = get_screen_size_in_world(0)}, 
+		draw_priority = .background
+	)
 }
 
 update_background :: proc(){
-	update_sprite(transform = Transform{pos = Vec2{g.camera.position.x, g.camera.position.y}}, id = game_state.background_sprite)
+	background_counter_rotation: Vec3
+	if g.camera.rotation != 0 do background_counter_rotation = {0, 0, 360 - to_degrees(g.camera.rotation)}
+	
+	update_sprite(
+		transform = Transform{pos = Vec2{g.camera.position.x, g.camera.position.y}, rot = background_counter_rotation}, 
+		id = game_state.background_sprite
+	)
+
+	if listen_screen_resized() do update_sprite_size(get_screen_size_in_world(0), game_state.background_sprite)
 }
 
 // CURSOR
@@ -2254,7 +2383,11 @@ init_cursor :: proc(){
 	//this makes cursor sizes consistant regardless of camera z pos (on init)
 	g.cursor.transform.size *= g.camera.position.zz
 
-	g.cursor.sprite_id = init_sprite(filename = g.cursor.filename, transform = g.cursor.transform, draw_priority = .cursor)
+	g.cursor.sprite_id = init_sprite(
+		filename = g.cursor.filename, 
+		transform = g.cursor.transform, 
+		draw_priority = .cursor
+	)
 }
 
 update_cursor :: proc(){
@@ -2275,22 +2408,18 @@ check_cursor_collision :: proc (){
 	pos := &transform.pos
 	size := &transform.size
 
-	wierd_const := (7.6/8)*g.camera.position.z
 	collision_offset := Vec2 {size.x/2, size.y/2}
-	screen_size_from_origin := Vec2 {sapp.widthf()/2, sapp.heightf()/2}
-	pixels_per_coord: f32 = sapp.heightf()/wierd_const
+	screen_size_world := get_screen_size_in_world(0)
 
-
-
-	if pos.y + collision_offset.y > screen_size_from_origin.y/ pixels_per_coord{
-		pos.y = (screen_size_from_origin.y / pixels_per_coord) - collision_offset.y
-	} else if pos.y - collision_offset.y < -(screen_size_from_origin.y / pixels_per_coord){
-		pos.y = -screen_size_from_origin.y / pixels_per_coord + collision_offset.y
+	if pos.y + collision_offset.y > screen_size_world.y / 2{
+		pos.y = (screen_size_world.y / 2) - collision_offset.y
+	} else if pos.y - collision_offset.y < -(screen_size_world.y / 2){
+		pos.y = -(screen_size_world.y / 2) + collision_offset.y
 	}
-	if pos.x + collision_offset.x > screen_size_from_origin.x/ pixels_per_coord{
-		pos.x = (screen_size_from_origin.x / pixels_per_coord) - collision_offset.x
-	} else if pos.x - collision_offset.x < -(screen_size_from_origin.x/ pixels_per_coord){
-		pos.x = -screen_size_from_origin.x / pixels_per_coord + collision_offset.x
+	if pos.x + collision_offset.x > screen_size_world.x / 2{
+		pos.x = (screen_size_world.x / 2) - collision_offset.x
+	} else if pos.x - collision_offset.x < -(screen_size_world.x / 2){
+		pos.x = -(screen_size_world.x / 2) + collision_offset.x
 	}
 }
 
@@ -2315,7 +2444,7 @@ camera_follow_player :: proc(lookahead: f32 = 0){
 // CAMERA
 
 Camera :: struct{
-	rotation: f32,
+	rotation: f32, // in radians
 	position: Vec3,
 	target: Vec3,
 	look: Vec2,
@@ -2523,7 +2652,7 @@ Camera_shake :: struct {
 	trauma: f32,
 	depletion: f32,
 	pos_offset: Vec2,
-	rot_offset: f32,
+	rot_offset: f32, // in radians
 	seed: i64,
 	time_offset: Vec2,
 }

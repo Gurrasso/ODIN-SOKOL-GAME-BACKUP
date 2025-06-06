@@ -44,7 +44,6 @@ void main() {
 	vec4 clippos = ((projection_matrix*view_matrix) * vec4(1, 2, 0, 1));
 	vec2 ndcpos = vec2(clippos.x/clippos.w, -clippos.y/ clippos.w);
 	light = (ndcpos.xy*0.5+0.5)*scz;
-
 }
 
 @end
