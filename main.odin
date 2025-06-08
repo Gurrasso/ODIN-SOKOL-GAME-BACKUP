@@ -811,6 +811,14 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 	return ray_plane_intersect_z(ray_origin, ray_dir, target_z).xyz
 }
 
+//get a size in pixels to size in world
+get_pixel_size_in_world :: proc(size: Vec2, target_z: f32) -> Vec2{
+	top_left := Vec2{0, 0}
+	bottom_right := size
+	
+	return screen_point_to_world_at_z(bottom_right, target_z).xy - screen_point_to_world_at_z(top_left, target_z).xy
+}
+
 //get the screen size in world coords at a certain z pos
 get_screen_size_in_world :: proc(target_z: f32) -> Vec2{
 	top_left := Vec2{0, 0}
@@ -2045,7 +2053,7 @@ update_player :: proc() {
 	motion : Vec2
 
 	//for flipping the player sprite
-	if g.cursor.transform.pos.x+g.camera.position.x <= transform.pos.x+ player.xflip_threshold*player.xflip{
+	if g.cursor.world_transform.pos.x <= transform.pos.x+ player.xflip_threshold*player.xflip{
 		player.xflip = 1
 	} else {
 		player.xflip = -1
@@ -2090,7 +2098,7 @@ update_player :: proc() {
 	holder_rotation_pos := transform.pos + ( player.item_offset.x * player.xflip)
 	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, transform.pos.y}
 
-	holder_rotation_vector := linalg.normalize0(g.cursor.transform.pos-(transform.pos - Vec2{g.camera.position.x, g.camera.position.y}))
+	holder_rotation_vector := linalg.normalize0(g.cursor.world_transform.pos-(transform.pos))
 	if holder_rotation_vector == {0, 0} do holder_rotation_vector = {1, 0}
 
 
@@ -2343,7 +2351,7 @@ update_background :: proc(){
 	if g.camera.rotation != 0 do background_counter_rotation = {0, 0, 360 - to_degrees(g.camera.rotation)}
 	
 	update_sprite(
-		transform = Transform{pos = Vec2{g.camera.position.x, g.camera.position.y}, rot = background_counter_rotation}, 
+		transform = Transform{pos = g.camera.position.xy, rot = background_counter_rotation}, 
 		id = game_state.background_sprite
 	)
 
@@ -2366,7 +2374,7 @@ init_cursor :: proc(){
 	g.cursor = Cursor{
 		transform = Transform{
 			pos = {1, 0},
-			size = {0.25, 0.25},
+			size = {24, 24}, // in pixels
 		},
 		//sensitivity
 		sensitivity = 2,
@@ -2378,10 +2386,8 @@ init_cursor :: proc(){
 		lookahead = 13,
 	}
 	
-	//this is just to make cursor sizes a little larger
-	g.cursor.transform.size /= 11
-	//this makes cursor sizes consistant regardless of camera z pos (on init)
-	g.cursor.transform.size *= g.camera.position.zz
+	//transform the pixel size to world size
+	g.cursor.transform.size = get_pixel_size_in_world(g.cursor.transform.size, 0);
 
 	g.cursor.sprite_id = init_sprite(
 		filename = g.cursor.filename, 
@@ -2394,7 +2400,7 @@ update_cursor :: proc(){
 	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity) * g.dt
 	check_cursor_collision()
 	g.cursor.world_transform = Transform{
-		pos = Vec2{g.camera.position.x - g.camera.camera_shake.pos_offset.x, g.camera.position.y - g.camera.camera_shake.pos_offset.y} + g.cursor.transform.pos,
+		pos = (g.camera.position.xy-g.camera.camera_shake.pos_offset) + g.cursor.transform.pos,
 		size = g.cursor.transform.size,
 		rot = g.cursor.transform.rot,
 	}
@@ -2426,7 +2432,7 @@ check_cursor_collision :: proc (){
 camera_follow_cursor :: proc(){
 	//camera follows cursor
 
-	cursor_dir := g.cursor.transform.pos-(g.player.transform.pos - Vec2{g.camera.position.x, g.camera.position.y})
+	cursor_dir := g.cursor.world_transform.pos-(g.player.transform.pos)
 
 	lookahead := get_vector_magnitude(cursor_dir)
 
