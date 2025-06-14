@@ -22,6 +22,7 @@ layout(binding=0) uniform Uniforms_Data {
 	mat4 view_matrix;
 	mat4 projection_matrix;
 	vec2 scz;
+	int reverse_screen_y;
 };
 
 
@@ -42,7 +43,7 @@ void main() {
 	screen_size = scz;
 
 	vec4 clippos = ((projection_matrix*view_matrix) * vec4(1, 2, 0, 1));
-	vec2 ndcpos = vec2(clippos.x/clippos.w, -clippos.y/ clippos.w);
+	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
 	light = (ndcpos.xy*0.5+0.5)*scz;
 }
 

@@ -4,7 +4,7 @@ package main
 /*
 	TODO: 
 
-	FIX shader coords having an inverted y on linux,
+	Item lags behind player especially at lower fps,
 
 	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
 
@@ -203,12 +203,17 @@ Globals :: struct {
 	enteties: Enteties,
 }
 
+backends_with_bottom_left_screen_origins: [3]sg.Backend : {.GLCORE, .GLES3, .WGPU}
+
 Rendering_globals :: struct {
 	//graphics stuff
 	shader: sg.Shader,
 	pipeline: sg.Pipeline,
 	index_buffer: sg.Buffer,	
 	sampler: sg.Sampler,
+	//assumes the correct screen origin to be top left
+	inverse_screen_y: bool,
+	reverse_screen_y: int,
 }
 
 Uniforms_vs_data :: struct{
@@ -216,6 +221,7 @@ Uniforms_vs_data :: struct{
 	veiw_matrix: Mat4,
 	projection_matrix: Mat4,
 	scz: Vec2,
+	reverse_screen_y: int,
 }
 
 
@@ -279,6 +285,14 @@ init_cb :: proc "c" (){
 	//the globals
 	g = new(Globals)
 	rg = new(Rendering_globals)
+
+	//different rendering backends have top left or bottom left as the screen origin
+	rg.inverse_screen_y = false
+	rg.reverse_screen_y = 1
+	if contains(backends_with_bottom_left_screen_origins, sg.query_backend()){
+		rg.inverse_screen_y = true
+		rg.reverse_screen_y = -1;
+	}
 
 	//white image for scuffed rect rendering
 	WHITE_IMAGE = get_image(WHITE_IMAGE_PATH)
@@ -484,6 +498,7 @@ frame_cb :: proc "c" (){
 			veiw_matrix = v,
 			projection_matrix = p,
 			scz = g.screen_size,
+			reverse_screen_y = rg.reverse_screen_y,
 		}))
 
 		sg.draw(0, 6, 1)
@@ -783,7 +798,7 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 
 	//Convert pixel to NDC
 	ndc_x := 2.0 * (point.x - viewport.x) / viewport.z - 1.0;
-	ndc_y := 2.0 * (point.y - viewport.y) / viewport.w - 1.0;
+	ndc_y := (2.0 * (point.y - viewport.y) / viewport.w - 1.0) * f32(rg.reverse_screen_y);
 
 	//Unproject near (depth = 0.0) and far (depth = 1.0) points
 	ndc_near := Vec4{ndc_x, ndc_y, -1.0, 1.0}; // Near plane
