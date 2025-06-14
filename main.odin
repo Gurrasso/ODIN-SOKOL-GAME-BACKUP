@@ -790,7 +790,7 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 
 	viewport := Vec4{0.0, 0.0, g.screen_size.x, g.screen_size.y}
 
-//projection matrix
+	//projection matrix
 	projection_matrix := linalg.matrix4_perspective_f32(70, g.screen_size.x / g.screen_size.y, 0.0001, 1000)
 	//view matrix
 	view_matrix := linalg.matrix4_look_at_f32(g.camera.position, g.camera.target, {g.camera.rotation, 1, 0})
@@ -798,7 +798,7 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 
 	//Convert pixel to NDC
 	ndc_x := 2.0 * (point.x - viewport.x) / viewport.z - 1.0;
-	ndc_y := (2.0 * (point.y - viewport.y) / viewport.w - 1.0);
+	ndc_y := (2.0 * (point.y - viewport.y) / viewport.w - 1.0) * -1;
 
 	//Unproject near (depth = 0.0) and far (depth = 1.0) points
 	ndc_near := Vec4{ndc_x, ndc_y, -1.0, 1.0}; // Near plane
@@ -831,9 +831,8 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 get_pixel_size_in_world :: proc(size: Vec2, target_z: f32) -> Vec2{
 	top_left := Vec2{0, 0}
 	bottom_right := size
-	log.debug(screen_point_to_world_at_z({0, 0}, 0))
 	
-	return screen_point_to_world_at_z(bottom_right, target_z).xy - screen_point_to_world_at_z(top_left, target_z).xy
+	return linalg.abs(screen_point_to_world_at_z(bottom_right, target_z).xy - screen_point_to_world_at_z(top_left, target_z).xy)
 }
 
 //get the screen size in world coords at a certain z pos
