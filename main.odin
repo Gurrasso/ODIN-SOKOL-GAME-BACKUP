@@ -398,6 +398,8 @@ fixed_frame_cb :: proc(){
 frame_cb :: proc "c" (){
 	context = default_context
 	
+	log.debug(g.screen_size)
+
 	//exit the program
 	if g.should_quit {
 		quit_game()

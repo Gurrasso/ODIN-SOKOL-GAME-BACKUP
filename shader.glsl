@@ -1,5 +1,5 @@
 // 
-//  TODO: 
+//  TODO: having some issues on window resize 
 // 
 
 @header package main
@@ -100,7 +100,6 @@ void main() {
 
 	tex_col += vec4((lightColor) * attenuation, 0);
 
-	
 
 	frag_color = tex_col;
 }
