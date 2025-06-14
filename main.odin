@@ -416,7 +416,6 @@ frame_cb :: proc "c" (){
 		time_since_fixed_update = 0
 	}
 
-	
 	//updates
 	update_game_state()
 
@@ -1882,7 +1881,7 @@ init_game_state :: proc(){
 	game_state = new(Game_state)
 
 	init_items()
-	
+	init_rect(transform = Transform{size = {0.2, 0.2}, pos = {1, 2}}, color = {1, 0, 0, 1})
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
 

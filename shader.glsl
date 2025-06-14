@@ -99,6 +99,7 @@ void main() {
   attenuation = pow(attenuation, 2.0);
 
 	tex_col += vec4((lightColor) * attenuation, 0);
+
 	
 
 	frag_color = tex_col;
