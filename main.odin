@@ -911,7 +911,6 @@ get_vertex_buffer :: proc(
 }
 
 
-//currently broken for some reason
 update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
 	exists: bool
 
