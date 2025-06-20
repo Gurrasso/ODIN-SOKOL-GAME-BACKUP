@@ -398,8 +398,6 @@ fixed_frame_cb :: proc(){
 frame_cb :: proc "c" (){
 	context = default_context
 	
-	log.debug(g.screen_size)
-
 	//exit the program
 	if g.should_quit {
 		quit_game()
@@ -1012,7 +1010,7 @@ xform_scale :: proc(scale: Vec2) -> Matrix4 {
 
 //removing objects
 
-remove_object ::	proc(id: string){
+remove_object ::	proc(id: Sprite_id){
 	assert(id in g.objects)
 
 	delete_key(&g.objects, id)
@@ -1209,6 +1207,7 @@ update_sprite :: proc{
 	update_sprite_transform,
 	update_sprite_transform_image,
 	update_sprite_image,
+	update_sprite_size,
 }
 
 update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: Sprite_id){
