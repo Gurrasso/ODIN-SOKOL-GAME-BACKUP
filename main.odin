@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	Seperate everything into multiple files(find a good way to organize the project)
+
 	Item lags behind player especially at lower fps,
 
 	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
