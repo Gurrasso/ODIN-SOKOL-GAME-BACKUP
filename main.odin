@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	use uuid:s,
+
 	Seperate everything into multiple files(find a good way to organize the project)
 
 	Item lags behind player especially at lower fps,
