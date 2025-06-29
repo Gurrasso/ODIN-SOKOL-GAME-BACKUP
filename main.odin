@@ -2403,13 +2403,12 @@ init_cursor :: proc(){
 		//divides the lookahead distance to get the actual lookahead of the camera
 		lookahead = 13,
 	}
-	
-	//transform the pixel size to world size
-	g.cursor.transform.size = get_pixel_size_in_world(g.cursor.transform.size, 0);
+
+	g.cursor.transform.size = get_pixel_size_in_world(g.cursor.transform.size, 0)
 
 	g.cursor.sprite_id = init_sprite(
 		filename = g.cursor.filename, 
-		transform = g.cursor.transform, 
+		transform = g.cursor.transform,
 		draw_priority = .cursor
 	)
 }
@@ -2422,6 +2421,7 @@ update_cursor :: proc(){
 		size = g.cursor.transform.size,
 		rot = g.cursor.transform.rot,
 	}
+	if listen_screen_resized() do update_sprite_size(size = g.cursor.world_transform.size, id = g.cursor.sprite_id)
 	update_sprite(transform = g.cursor.world_transform, id = g.cursor.sprite_id)
 }
 
@@ -2430,7 +2430,7 @@ check_cursor_collision :: proc (){
 
 	transform := &g.cursor.transform
 	pos := &transform.pos
-	size := &transform.size
+	size := transform.size
 
 	collision_offset := Vec2 {size.x/2, size.y/2}
 	screen_size_world := get_screen_size_in_world(0)
