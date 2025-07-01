@@ -6,6 +6,8 @@ package main
 
 	use uuid:s,
 
+	maybe try and implement everything as an entity,
+
 	Seperate everything into multiple files(find a good way to organize the project)
 
 	Item lags behind player especially at lower fps,
@@ -30,7 +32,6 @@ package main
 	make it so item holders can hold nothing,
 	weapons dont work for multiple enteties at a time,
 	
-	make sure everything that should use the transform struct uses it,
 	make sure we use the same naming for pos, rot etc everywhere,
 
 	sprite sheet rendering,
@@ -452,7 +453,6 @@ frame_cb :: proc "c" (){
 			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
 	
-			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
 				vertex_buffers = { 0 = obj.vertex_buffer },
 				index_buffer = rg.index_buffer,
@@ -475,7 +475,6 @@ frame_cb :: proc "c" (){
 			//model matrix turns vertex positions into world space positions
 			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
 	
-			//apply the bindings(something that says which things we want to draw)
 			b := sg.Bindings {
 				vertex_buffers = { 0 = obj.vertex_buffer },
 				index_buffer = rg.index_buffer,
@@ -1884,7 +1883,7 @@ give_item :: proc(holder: ^Item_holder, item_id: string){
 
 init_background :: proc(color: Vec3 = {255, 255, 255}){
 	game_state.background_sprite = init_rect(
-		color = sg_color(color3 = color),  
+		color = sg_color(color3 = color),
 		transform = Transform{size = get_screen_size_in_world(0)}, 
 		draw_priority = .background
 	)
@@ -2288,7 +2287,7 @@ init_game_state :: proc(){
 
 	init_cursor()
 
-	init_background({112, 112, 112})
+	init_background({120, 120, 120})
 }
 
 update_game_state :: proc(){
@@ -2724,5 +2723,3 @@ init_weapons :: proc(){
 
 
 }
-
-

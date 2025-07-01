@@ -1,5 +1,5 @@
 // 
-//  TODO: having some issues on window resize 
+//  TODO: having some issues on window resize on linux 
 // 
 
 @header package main
