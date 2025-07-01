@@ -23,6 +23,7 @@ layout(binding=0) uniform Uniforms_Data {
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
+	vec4[3] lights_pos;
 };
 
 
@@ -31,7 +32,7 @@ out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
 out vec2 screen_size;
-out vec2 light;
+out vec2[3] lights;
 
 void main() {
 	//model_view_projection matrix for the objects
@@ -42,19 +43,24 @@ void main() {
 	bytes = bytes0;
 	screen_size = scz;
 
-	vec4 clippos = ((projection_matrix*view_matrix) * vec4(1, 2, 0, 1));
-	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
-	light = (ndcpos.xy*0.5+0.5)*scz;
+	vec2[3] lights_pos0;
+
+	for(int i = 0; i < lights_pos.length(); i++){
+		vec4 clippos = (projection_matrix*view_matrix) * vec4(lights_pos[i].x, lights_pos[i].y, 0, 1);
+		vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
+		lights_pos0[i] = (ndcpos.xy*0.5+0.5)*scz;
+		lights = lights_pos0;
+	}
+
+
 }
 
 @end
 
 // :FRAGMENT SHADER
-
 @fs fs
 
 //Utils
-
 @include shader_utils.glsl
 
 // vars
@@ -62,13 +68,28 @@ in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
 in vec2 screen_size;
-in vec2 light;
+in vec2[3] lights;
 
 layout(binding=0) uniform texture2D tex;
 // sampler specifies things
 layout(binding=0) uniform sampler smp;
 
 out vec4 frag_color; 
+
+vec4 tex_col = vec4(1.0);
+
+void update_lighting(){
+	for(int i = 0; i < lights.length(); i++){
+		float dist = length(gl_FragCoord.xy-lights[i].xy);
+		vec3 lightColor = rgb_to_sg_color(vec3(253, 255, 199));
+		float lightRadius = 20; // in screen pixels
+
+		float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
+  	attenuation = pow(attenuation, 2.0);
+
+		tex_col += vec4((lightColor) * attenuation, 0);
+	}
+}
 
 void main() {
 
@@ -77,8 +98,6 @@ void main() {
 	new_texcoord.y = 1 - new_texcoord.y;
 
 	int tex_index = int(bytes.x * 255.0);
-
-	vec4 tex_col = vec4(1.0);
 
 	if (tex_index == 0) {				// ALL NORMAL TEXTURES
 		tex_col = texture(sampler2D(tex, smp), new_texcoord);
@@ -91,15 +110,7 @@ void main() {
 
 	tex_col *= color;
 
-	float dist = length(gl_FragCoord.xy-light.xy);
-	vec3 lightColor = rgb_to_sg_color(vec3(253, 255, 199));
-	float lightRadius = 400; // in screen pixels
-
-	float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
-  attenuation = pow(attenuation, 2.0);
-
-	tex_col += vec4((lightColor) * attenuation, 0);
-
+	update_lighting();
 
 	frag_color = tex_col;
 }

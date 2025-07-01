@@ -136,8 +136,8 @@ Vertex_buffer_data :: struct{
 	buffer: sg.Buffer,
 }
 
-Object_group :: struct{
-	objects: [dynamic]Object,
+Sprite_object_group :: struct{
+	objects: [dynamic]Sprite_object,
 }
 
 
@@ -147,7 +147,7 @@ Images :: struct{
 }
 
 // Handle multiple objects
-Object :: struct{
+Sprite_object :: struct{
 	pos: Vec3,
 	rot: Vec3,
 	img: sg.Image,
@@ -191,9 +191,10 @@ Globals :: struct {
 	screen_size: Vec2,
 	frame_count: i32,
 	dt: f32,
-	//Objects for drawing
+	//Sprite_objects for drawing
 	text_objects: map[string]Text_object,
-	objects: map[string]Object_group,
+	objects: map[string]Sprite_object_group,
+	lights: map[string]Light,
 	//Things there are only one of
 	camera: Camera,
 	player: Player,
@@ -226,6 +227,7 @@ Uniforms_vs_data :: struct{
 	projection_matrix: Mat4,
 	scz: Vec2,
 	reverse_screen_y: int,
+	lights_pos: [3]Vec4,
 }
 
 
@@ -502,6 +504,7 @@ frame_cb :: proc "c" (){
 			projection_matrix = p,
 			scz = g.screen_size,
 			reverse_screen_y = rg.reverse_screen_y,
+			lights_pos = {{2, 1, 0, 0}, {0.4, 0.2, 0, 0}, {4, 3, 0, 0}}
 		}))
 
 		sg.draw(0, 6, 1)
@@ -634,17 +637,75 @@ get_image_desc :: proc(filename: cstring) -> sapp.Image_Desc{
 	return image_desc
 }
 
-//var for mouse movement
-mouse_move: Vec2
+// BUFFER THINGS
 
-//stores the states for all keys
-key_down: #sparse[sapp.Keycode]bool
-single_key_up: #sparse[sapp.Keycode]bool
-single_key_down: #sparse[sapp.Keycode]bool
-mouse_down: #sparse[sapp.Mousebutton]bool
-single_mouse_down: #sparse[sapp.Mousebutton]bool
-single_mouse_up: #sparse[sapp.Mousebutton]bool
-screen_resized: bool
+// checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
+get_vertex_buffer :: proc(
+	size: Vec2, 
+	color_offset: sg.Color, 
+	uvs: Vec4, tex_index: u8
+) -> sg.Buffer{
+	
+	buffer: sg.Buffer
+	
+	buffer_exists: bool = false
+	for vertex_buffer in g.vertex_buffers{
+		if vertex_buffer.uv_data != uvs || vertex_buffer.size_data != size || vertex_buffer.color_data != color_offset || vertex_buffer.tex_index_data != tex_index do continue
+		
+		buffer_exists = true
+		buffer = vertex_buffer.buffer
+		break
+	}
+	if !buffer_exists{
+		vertices := []Vertex_data {
+			{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index},
+			{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
+			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
+			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
+		}
+		buffer = sg.make_buffer({size = sg_range(vertices).size, usage = .DYNAMIC})
+		sg.update_buffer(buffer, data = sg_range(vertices))
+
+		buffer_data := Vertex_buffer_data{
+			buffer = buffer,
+			uv_data = uvs,
+			size_data = size,
+			color_data = color_offset,
+			tex_index_data = tex_index,
+		}
+		append(&g.vertex_buffers, buffer_data)
+	}
+
+	return buffer
+}
+
+
+update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
+	exists: bool
+
+	for &buffer_data in g.vertex_buffers{
+		if buffer_data.buffer == buffer{
+			color_offset := buffer_data.color_data
+			uvs := buffer_data.uv_data
+			tex_index := buffer_data.tex_index_data
+			buffer_data.size_data = size
+
+			vertices := []Vertex_data {
+				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index },
+				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
+				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
+				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
+			}
+
+			sg.update_buffer(buffer, sg_range(vertices))
+
+			exists = true
+		}
+	}
+
+	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_size")
+}
+
 
 
 
@@ -869,77 +930,20 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 }
 
 
-//buffer util
-
-
-// checks if the buffer already exists and if so it grabs that otherwise it creates it and adds it to an array
-get_vertex_buffer :: proc(
-	size: Vec2, 
-	color_offset: sg.Color, 
-	uvs: Vec4, tex_index: u8
-) -> sg.Buffer{
-	
-	buffer: sg.Buffer
-	
-	buffer_exists: bool = false
-	for vertex_buffer in g.vertex_buffers{
-		if vertex_buffer.uv_data != uvs || vertex_buffer.size_data != size || vertex_buffer.color_data != color_offset || vertex_buffer.tex_index_data != tex_index do continue
-		
-		buffer_exists = true
-		buffer = vertex_buffer.buffer
-		break
-	}
-	if !buffer_exists{
-		vertices := []Vertex_data {
-			{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index},
-			{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
-			{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
-			{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
-		}
-		buffer = sg.make_buffer({size = sg_range(vertices).size, usage = .DYNAMIC})
-		sg.update_buffer(buffer, data = sg_range(vertices))
-
-		buffer_data := Vertex_buffer_data{
-			buffer = buffer,
-			uv_data = uvs,
-			size_data = size,
-			color_data = color_offset,
-			tex_index_data = tex_index,
-		}
-		append(&g.vertex_buffers, buffer_data)
-	}
-
-	return buffer
-}
-
-
-update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
-	exists: bool
-
-	for &buffer_data in g.vertex_buffers{
-		if buffer_data.buffer == buffer{
-			color_offset := buffer_data.color_data
-			uvs := buffer_data.uv_data
-			tex_index := buffer_data.tex_index_data
-			buffer_data.size_data = size
-
-			vertices := []Vertex_data {
-				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index },
-				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
-				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
-				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
-			}
-
-			sg.update_buffer(buffer, sg_range(vertices))
-
-			exists = true
-		}
-	}
-
-	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_size")
-}
 
 // EVENT UTILS (dont really need all of these procs but it makes it a bit more intuitive)
+
+//var for mouse movement
+mouse_move: Vec2
+
+//stores the states for all keys
+key_down: #sparse[sapp.Keycode]bool
+single_key_up: #sparse[sapp.Keycode]bool
+single_key_down: #sparse[sapp.Keycode]bool
+mouse_down: #sparse[sapp.Mousebutton]bool
+single_mouse_down: #sparse[sapp.Mousebutton]bool
+single_mouse_up: #sparse[sapp.Mousebutton]bool
+screen_resized: bool
 
 //key press utils
 
@@ -1128,10 +1132,6 @@ init_icon :: proc(imagefile: cstring){
 	sapp.set_icon(icon_desc)
 }
 
-
-
-
-
 // =============
 //   :DRAWING
 // =============
@@ -1177,12 +1177,12 @@ init_sprite_from_img :: proc(
 	buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
 
 	if id in g.objects == false{
-		g.objects[id] = Object_group{}
+		g.objects[id] = Sprite_object_group{}
 	}
 
 	object_group := &g.objects[id]
 
-	append(&object_group.objects, Object{
+	append(&object_group.objects, Sprite_object{
 		vec2_to_vec3(transform.pos),
 		transform.rot,
 		img,
@@ -1218,7 +1218,7 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: S
 	assert(id in g.objects)
 
 	for &object in g.objects[id].objects{
-		object = Object{
+		object = Sprite_object{
 			vec2_to_vec3(transform.pos),
 			transform.rot,
 			img,
@@ -1234,7 +1234,7 @@ update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 
 	for &object in g.objects[id].objects{
 
-		object = Object{
+		object = Sprite_object{
 			object.pos,
 			object.rot,
 			img,
@@ -1251,7 +1251,7 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 
 	for &object in g.objects[id].objects{
 
-		object = Object{
+		object = Sprite_object{
 			vec2_to_vec3(transform.pos),
 			transform.rot,
 			object.img,
@@ -1597,6 +1597,20 @@ update_text_pos :: proc(pos: Vec2, id: string){
 	}
 }
 
+// =================
+//    :LIGHTING
+// =================
+
+Light :: struct{
+	pos: Vec2,
+	size: f32,
+	color: sg.Color,
+}
+
+init_light :: proc(pos: Vec2 = {0, 0}, size: f32 = 1, color: sg.Color = {1, 1, 1, 1}){
+	
+}
+
 // ================
 //    :ENTETIES
 // ================
@@ -1861,6 +1875,368 @@ give_item :: proc(holder: ^Item_holder, item_id: string){
 	init_item_holder(holder)
 }
 
+// ====================
+//   :CAMERA :CURSOR :BACKGROUND
+// ====================
+
+// BACKGROUND
+
+
+init_background :: proc(color: Vec3 = {255, 255, 255}){
+	game_state.background_sprite = init_rect(
+		color = sg_color(color3 = color),  
+		transform = Transform{size = get_screen_size_in_world(0)}, 
+		draw_priority = .background
+	)
+}
+
+update_background :: proc(){
+	background_counter_rotation: Vec3
+	if g.camera.rotation != 0 do background_counter_rotation = {0, 0, 360 - to_degrees(g.camera.rotation)}
+	
+	update_sprite(
+		transform = Transform{pos = g.camera.position.xy, rot = background_counter_rotation}, 
+		id = game_state.background_sprite
+	)
+
+	if listen_screen_resized() do update_sprite_size(get_screen_size_in_world(0), game_state.background_sprite)
+}
+
+// CURSOR
+
+Cursor :: struct{
+	transform: Transform,	
+	world_transform: Transform,
+	sensitivity: f32,
+	filename: cstring,
+	lookahead_distance: f32,
+	lookahead: f32,
+	sprite_id: Sprite_id,
+}
+
+init_cursor :: proc(){
+	g.cursor = Cursor{
+		transform = Transform{
+			pos = {1, 0},
+			size = {24, 24}, // in pixels
+		},
+		//sensitivity
+		sensitivity = 2,
+		//cursor sprite path
+		filename = "./src/assets/sprites/Cursor2.png",
+		//how far the mouse movement affects the lookahead of the camera
+		lookahead_distance = 10,
+		//divides the lookahead distance to get the actual lookahead of the camera
+		lookahead = 13,
+	}
+
+	g.cursor.transform.size = get_pixel_size_in_world(g.cursor.transform.size, 0)
+
+	g.cursor.sprite_id = init_sprite(
+		filename = g.cursor.filename, 
+		transform = g.cursor.transform,
+		draw_priority = .cursor
+	)
+}
+
+update_cursor :: proc(){
+	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity) * g.dt
+	check_cursor_collision()
+	g.cursor.world_transform = Transform{
+		pos = (g.camera.position.xy-g.camera.camera_shake.pos_offset) + g.cursor.transform.pos,
+		size = g.cursor.transform.size,
+		rot = g.cursor.transform.rot,
+	}
+	if listen_screen_resized() do update_sprite_size(size = g.cursor.world_transform.size, id = g.cursor.sprite_id)
+	update_sprite(transform = g.cursor.world_transform, id = g.cursor.sprite_id)
+}
+
+//check the cursor collision with the screen
+check_cursor_collision :: proc (){
+
+	transform := &g.cursor.transform
+	pos := &transform.pos
+	size := transform.size
+
+	collision_offset := Vec2 {size.x/2, size.y/2}
+	screen_size_world := get_screen_size_in_world(0)
+
+	if pos.y + collision_offset.y > screen_size_world.y / 2{
+		pos.y = (screen_size_world.y / 2) - collision_offset.y
+	} else if pos.y - collision_offset.y < -(screen_size_world.y / 2){
+		pos.y = -(screen_size_world.y / 2) + collision_offset.y
+	}
+	if pos.x + collision_offset.x > screen_size_world.x / 2{
+		pos.x = (screen_size_world.x / 2) - collision_offset.x
+	} else if pos.x - collision_offset.x < -(screen_size_world.x / 2){
+		pos.x = -(screen_size_world.x / 2) + collision_offset.x
+	}
+}
+
+camera_follow_cursor :: proc(){
+	//camera follows cursor
+
+	cursor_dir := g.cursor.world_transform.pos-(g.player.transform.pos)
+
+	lookahead := get_vector_magnitude(cursor_dir)
+
+	lookahead = math.clamp(lookahead, -g.cursor.lookahead_distance, g.cursor.lookahead_distance)
+
+	lookahead /= g.cursor.lookahead
+
+	camera_follow(g.player.transform.pos, lookahead, cursor_dir)
+}
+
+camera_follow_player :: proc(lookahead: f32 = 0){
+	camera_follow(g.player.transform.pos, lookahead, g.player.look_dir)
+}
+
+// CAMERA
+
+Camera :: struct{
+	rotation: f32, // in radians
+	position: Vec3,
+	target: Vec3,
+	look: Vec2,
+	//an object for the asympatic averaging of the camera movement
+	asym_obj: Asympatic_object,
+	asym_forces: [dynamic]Asympatic_depletion,
+	zoom: Camera_zoom,
+
+	lookahead_asym_obj: Asympatic_object,
+
+	camera_shake: Camera_shake,
+}
+
+Asympatic_depletion :: struct{
+	depletion: f32,
+	threshold: f32,
+}
+
+Camera_zoom :: struct{
+	max: f32,
+	threshold: f32,
+	default: f32,
+	speed: f32,
+	enabled: bool,
+}
+
+LOOK_SENSITIVITY :: 0.3
+
+init_camera :: proc(){
+	//setup the camera
+	g.camera = {
+		rotation = 0,
+		position = { 0,0,11 },
+		//what the camera is looking at
+		target = { 0,0,-1 },
+		//how much to zoom out, when to max out and how fast to zoom
+		zoom = {
+			max = 12,
+			threshold = 0.0002,
+			speed = 5,
+			enabled = false,
+		},
+
+		//spring forces has to be in order
+		//the camera will go between these values smoothly
+		asym_forces = {
+			//when standing still
+			{14, 0},
+			//when walking
+			{11, 0.0002},
+			//when sprinting
+			{13, 0.00035},
+			//max speed
+			{16, 0.0004}
+		},
+
+
+		//a spring for the lookahead of the camera
+		lookahead_asym_obj = Asympatic_object{
+			depletion = 25,
+		}
+	}
+
+	//set the camera zoom position
+	g.camera.zoom.default = g.camera.position.z
+
+	//set the camera positions to the player
+	g.camera.position.x = g.player.transform.pos.x
+	g.camera.position.y = g.player.transform.pos.y
+	g.camera.target.x = g.player.transform.pos.x
+	g.camera.target.y = g.player.transform.pos.y
+	g.camera.asym_obj.position = g.player.transform.pos
+	g.camera.asym_obj.destination = g.player.transform.pos
+	g.camera.lookahead_asym_obj.position = g.player.transform.pos
+	g.camera.lookahead_asym_obj.destination = g.player.transform.pos
+
+	init_camera_shake()
+
+}
+
+last_pos: Vec2
+current_pos: Vec2
+
+
+//follows a 2d position 
+camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = {0, 0}) {
+
+	current_pos := position
+
+	//pos camera wants to look at
+	lookahead_pos := (linalg.normalize0(lookahead_dir) * lookahead)
+	g.camera.lookahead_asym_obj.destination = lookahead_pos
+
+	g.camera.asym_obj.destination = position
+
+	//difference pos between last frame and this frame
+	pos_difference := current_pos - last_pos
+	//how fast the player is moving
+	move_mag := get_vector_magnitude(pos_difference) * g.dt
+
+	//change the spring force with a gradient between different values
+	for i := 0; i<len(g.camera.asym_forces); i+=1 {
+		//the current threshold and force values
+		sf := g.camera.asym_forces[i]
+		
+		if move_mag < sf.threshold do break
+		//if we are not in the last element of the array
+		if i < len(g.camera.asym_forces) -1 {
+			//the next threshold and force values
+			next_sf := g.camera.asym_forces[i+1]
+
+			//difference between the different thresholds
+			threshold_player_diff := move_mag - sf.threshold
+			threshold_diff := next_sf.threshold - sf.threshold
+
+			//how much of the threshold value we are at
+			value_index := threshold_player_diff/threshold_diff
+
+			//adds a percentage of the next spring force dependent on our movement speed
+			g.camera.asym_obj.depletion = sf.depletion + math.lerp(sf.threshold, next_sf.threshold, value_index) 
+		//if we are in the last element of the aray. Means we are at the max values
+		} else {
+			g.camera.asym_obj.depletion = sf.depletion
+		}
+	}
+
+	//change how much the camera is zoomed out ( depentent on movement speed )
+	// only need to update if we actually have any zoom and if it's enabled
+	if g.camera.zoom.default != g.camera.zoom.max && g.camera.zoom.enabled{
+		zoom_value_index := (move_mag/g.camera.zoom.threshold)
+		zoom_value_index = math.clamp(zoom_value_index, 0, 1)
+
+		//desired zoom position
+		zoom_zpos := math.lerp(g.camera.zoom.default, g.camera.zoom.max, zoom_value_index)
+
+		//slowly moves the z pos of camera to the desired zoom position
+		if zoom_zpos > g.camera.position.z{
+			g.camera.position.z += g.camera.zoom.speed * g.dt
+		} else if zoom_zpos < g.camera.position.z{
+			g.camera.position.z -= g.camera.zoom.speed * g.dt
+		}
+	}
+
+	
+	//update the spring physics and update the camera position
+	update_asympatic_averaging(&g.camera.asym_obj)
+	update_asympatic_averaging(&g.camera.lookahead_asym_obj)
+
+	last_pos = current_pos
+
+}
+
+update_camera_position :: proc(position: Vec2, rotation: f32){
+	g.camera.position = Vec3{position.x, position.y, g.camera.position.z}
+	g.camera.target = Vec3{position.x ,position.y, g.camera.target.z}
+	g.camera.rotation = rotation
+}
+
+update_camera :: proc(){
+	update_camera_shake()
+
+	camera_follow_cursor()
+
+	update_camera_position(g.camera.asym_obj.position + g.camera.lookahead_asym_obj.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
+}
+
+
+//function for moving around camera in 3D
+move_camera_3D :: proc() {
+	move_input: Vec2
+	if key_down[.W] do move_input.y = 1
+	else if key_down[.S] do move_input.y = -1
+	if key_down[.A] do move_input.x = -1
+	else if key_down[.D] do move_input.x = 1
+
+	look_input: Vec2 = -mouse_move * LOOK_SENSITIVITY
+	g.camera.look += look_input
+	g.camera.look.x = math.wrap(g.camera.look.x, 360)
+	g.camera.look.y = math.clamp(g.camera.look.y, -89, 89)
+
+	look_mat := linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(g.camera.look.x), to_radians(g.camera.look.y), 0)
+	forward := ( look_mat * Vec4 {0,0,-1,1} ).xyz
+	right := ( look_mat * Vec4 {1,0,0,1} ).xyz
+
+
+	move_dir := forward * move_input.y + right * move_input.x
+
+	motion := linalg.normalize0(move_dir) * g.player.move_speed * g.dt
+	g.camera.position += motion
+
+	g.camera.target = g.camera.position + forward
+}
+
+//shake the camera by setting the trauma
+shake_camera :: proc(trauma: f32){
+	g.camera.camera_shake.trauma = trauma
+}
+
+
+// 
+// CAMERA SHAKE
+// 
+
+Camera_shake :: struct {
+	trauma: f32,
+	depletion: f32,
+	pos_offset: Vec2,
+	rot_offset: f32, // in radians
+	seed: i64,
+	time_offset: Vec2,
+}
+
+init_camera_shake :: proc(){
+	g.camera.camera_shake = Camera_shake{
+		trauma = 0,
+		depletion = 8,
+		pos_offset = { 0,0 },
+		rot_offset = 0,
+		seed = 223492,
+		time_offset = { 5,5 }
+	}
+}
+
+update_camera_shake :: proc(){
+	cs := &g.camera.camera_shake
+	if cs.trauma <= 0{
+		cs.pos_offset = { 0,0 }
+		cs.rot_offset = 0
+		cs.trauma = 0
+	} else {
+		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
+
+		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
+		cs.pos_offset /= 45
+		cs.pos_offset *= cs.trauma * cs.trauma
+		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
+		cs.rot_offset /= 100
+		cs.rot_offset *= cs.trauma * cs.trauma * cs.trauma
+
+		cs.trauma -= cs.depletion * g.dt
+	}
+}
 
 
 // ==============
@@ -2349,366 +2725,4 @@ init_weapons :: proc(){
 
 }
 
-// ====================
-//   :CAMERA :CURSOR :BACKGROUND
-// ====================
-
-// BACKGROUND
-
-
-init_background :: proc(color: Vec3 = {255, 255, 255}){
-	game_state.background_sprite = init_rect(
-		color = sg_color(color3 = color),  
-		transform = Transform{size = get_screen_size_in_world(0)}, 
-		draw_priority = .background
-	)
-}
-
-update_background :: proc(){
-	background_counter_rotation: Vec3
-	if g.camera.rotation != 0 do background_counter_rotation = {0, 0, 360 - to_degrees(g.camera.rotation)}
-	
-	update_sprite(
-		transform = Transform{pos = g.camera.position.xy, rot = background_counter_rotation}, 
-		id = game_state.background_sprite
-	)
-
-	if listen_screen_resized() do update_sprite_size(get_screen_size_in_world(0), game_state.background_sprite)
-}
-
-// CURSOR
-
-Cursor :: struct{
-	transform: Transform,	
-	world_transform: Transform,
-	sensitivity: f32,
-	filename: cstring,
-	lookahead_distance: f32,
-	lookahead: f32,
-	sprite_id: Sprite_id,
-}
-
-init_cursor :: proc(){
-	g.cursor = Cursor{
-		transform = Transform{
-			pos = {1, 0},
-			size = {24, 24}, // in pixels
-		},
-		//sensitivity
-		sensitivity = 2,
-		//cursor sprite path
-		filename = "./src/assets/sprites/Cursor2.png",
-		//how far the mouse movement affects the lookahead of the camera
-		lookahead_distance = 10,
-		//divides the lookahead distance to get the actual lookahead of the camera
-		lookahead = 13,
-	}
-
-	g.cursor.transform.size = get_pixel_size_in_world(g.cursor.transform.size, 0)
-
-	g.cursor.sprite_id = init_sprite(
-		filename = g.cursor.filename, 
-		transform = g.cursor.transform,
-		draw_priority = .cursor
-	)
-}
-
-update_cursor :: proc(){
-	g.cursor.transform.pos += (Vec2{mouse_move.x, -mouse_move.y} * g.cursor.sensitivity) * g.dt
-	check_cursor_collision()
-	g.cursor.world_transform = Transform{
-		pos = (g.camera.position.xy-g.camera.camera_shake.pos_offset) + g.cursor.transform.pos,
-		size = g.cursor.transform.size,
-		rot = g.cursor.transform.rot,
-	}
-	if listen_screen_resized() do update_sprite_size(size = g.cursor.world_transform.size, id = g.cursor.sprite_id)
-	update_sprite(transform = g.cursor.world_transform, id = g.cursor.sprite_id)
-}
-
-//check the cursor collision with the screen
-check_cursor_collision :: proc (){
-
-	transform := &g.cursor.transform
-	pos := &transform.pos
-	size := transform.size
-
-	collision_offset := Vec2 {size.x/2, size.y/2}
-	screen_size_world := get_screen_size_in_world(0)
-
-	if pos.y + collision_offset.y > screen_size_world.y / 2{
-		pos.y = (screen_size_world.y / 2) - collision_offset.y
-	} else if pos.y - collision_offset.y < -(screen_size_world.y / 2){
-		pos.y = -(screen_size_world.y / 2) + collision_offset.y
-	}
-	if pos.x + collision_offset.x > screen_size_world.x / 2{
-		pos.x = (screen_size_world.x / 2) - collision_offset.x
-	} else if pos.x - collision_offset.x < -(screen_size_world.x / 2){
-		pos.x = -(screen_size_world.x / 2) + collision_offset.x
-	}
-}
-
-camera_follow_cursor :: proc(){
-	//camera follows cursor
-
-	cursor_dir := g.cursor.world_transform.pos-(g.player.transform.pos)
-
-	lookahead := get_vector_magnitude(cursor_dir)
-
-	lookahead = math.clamp(lookahead, -g.cursor.lookahead_distance, g.cursor.lookahead_distance)
-
-	lookahead /= g.cursor.lookahead
-
-	camera_follow(g.player.transform.pos, lookahead, cursor_dir)
-}
-
-camera_follow_player :: proc(lookahead: f32 = 0){
-	camera_follow(g.player.transform.pos, lookahead, g.player.look_dir)
-}
-
-// CAMERA
-
-Camera :: struct{
-	rotation: f32, // in radians
-	position: Vec3,
-	target: Vec3,
-	look: Vec2,
-	//an object for the asympatic averaging of the camera movement
-	asym_obj: Asympatic_object,
-	asym_forces: [dynamic]Asympatic_depletion,
-	zoom: Camera_zoom,
-
-	lookahead_asym_obj: Asympatic_object,
-
-	camera_shake: Camera_shake,
-}
-
-Asympatic_depletion :: struct{
-	depletion: f32,
-	threshold: f32,
-}
-
-Camera_zoom :: struct{
-	max: f32,
-	threshold: f32,
-	default: f32,
-	speed: f32,
-	enabled: bool,
-}
-
-LOOK_SENSITIVITY :: 0.3
-
-init_camera :: proc(){
-	//setup the camera
-	g.camera = {
-		rotation = 0,
-		position = { 0,0,11 },
-		//what the camera is looking at
-		target = { 0,0,-1 },
-		//how much to zoom out, when to max out and how fast to zoom
-		zoom = {
-			max = 12,
-			threshold = 0.0002,
-			speed = 5,
-			enabled = false,
-		},
-
-		//spring forces has to be in order
-		//the camera will go between these values smoothly
-		asym_forces = {
-			//when standing still
-			{14, 0},
-			//when walking
-			{11, 0.0002},
-			//when sprinting
-			{13, 0.00035},
-			//max speed
-			{16, 0.0004}
-		},
-
-
-		//a spring for the lookahead of the camera
-		lookahead_asym_obj = Asympatic_object{
-			depletion = 25,
-		}
-	}
-
-	//set the camera zoom position
-	g.camera.zoom.default = g.camera.position.z
-
-	//set the camera positions to the player
-	g.camera.position.x = g.player.transform.pos.x
-	g.camera.position.y = g.player.transform.pos.y
-	g.camera.target.x = g.player.transform.pos.x
-	g.camera.target.y = g.player.transform.pos.y
-	g.camera.asym_obj.position = g.player.transform.pos
-	g.camera.asym_obj.destination = g.player.transform.pos
-	g.camera.lookahead_asym_obj.position = g.player.transform.pos
-	g.camera.lookahead_asym_obj.destination = g.player.transform.pos
-
-	init_camera_shake()
-
-}
-
-last_pos: Vec2
-current_pos: Vec2
-
-
-//follows a 2d position 
-camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = {0, 0}) {
-
-	current_pos := position
-
-	//pos camera wants to look at
-	lookahead_pos := (linalg.normalize0(lookahead_dir) * lookahead)
-	g.camera.lookahead_asym_obj.destination = lookahead_pos
-
-	g.camera.asym_obj.destination = position
-
-	//difference pos between last frame and this frame
-	pos_difference := current_pos - last_pos
-	//how fast the player is moving
-	move_mag := get_vector_magnitude(pos_difference) * g.dt
-
-	//change the spring force with a gradient between different values
-	for i := 0; i<len(g.camera.asym_forces); i+=1 {
-		//the current threshold and force values
-		sf := g.camera.asym_forces[i]
-		
-		if move_mag < sf.threshold do break
-		//if we are not in the last element of the array
-		if i < len(g.camera.asym_forces) -1 {
-			//the next threshold and force values
-			next_sf := g.camera.asym_forces[i+1]
-
-			//difference between the different thresholds
-			threshold_player_diff := move_mag - sf.threshold
-			threshold_diff := next_sf.threshold - sf.threshold
-
-			//how much of the threshold value we are at
-			value_index := threshold_player_diff/threshold_diff
-
-			//adds a percentage of the next spring force dependent on our movement speed
-			g.camera.asym_obj.depletion = sf.depletion + math.lerp(sf.threshold, next_sf.threshold, value_index) 
-		//if we are in the last element of the aray. Means we are at the max values
-		} else {
-			g.camera.asym_obj.depletion = sf.depletion
-		}
-	}
-
-	//change how much the camera is zoomed out ( depentent on movement speed )
-	// only need to update if we actually have any zoom and if it's enabled
-	if g.camera.zoom.default != g.camera.zoom.max && g.camera.zoom.enabled{
-		zoom_value_index := (move_mag/g.camera.zoom.threshold)
-		zoom_value_index = math.clamp(zoom_value_index, 0, 1)
-
-		//desired zoom position
-		zoom_zpos := math.lerp(g.camera.zoom.default, g.camera.zoom.max, zoom_value_index)
-
-		//slowly moves the z pos of camera to the desired zoom position
-		if zoom_zpos > g.camera.position.z{
-			g.camera.position.z += g.camera.zoom.speed * g.dt
-		} else if zoom_zpos < g.camera.position.z{
-			g.camera.position.z -= g.camera.zoom.speed * g.dt
-		}
-	}
-
-	
-	//update the spring physics and update the camera position
-	update_asympatic_averaging(&g.camera.asym_obj)
-	update_asympatic_averaging(&g.camera.lookahead_asym_obj)
-
-	last_pos = current_pos
-
-}
-
-update_camera_position :: proc(position: Vec2, rotation: f32){
-	g.camera.position = Vec3{position.x, position.y, g.camera.position.z}
-	g.camera.target = Vec3{position.x ,position.y, g.camera.target.z}
-	g.camera.rotation = rotation
-}
-
-update_camera :: proc(){
-	update_camera_shake()
-
-	camera_follow_cursor()
-
-	update_camera_position(g.camera.asym_obj.position + g.camera.lookahead_asym_obj.position + g.camera.camera_shake.pos_offset, g.camera.camera_shake.rot_offset)
-}
-
-
-//function for moving around camera in 3D
-move_camera_3D :: proc() {
-	move_input: Vec2
-	if key_down[.W] do move_input.y = 1
-	else if key_down[.S] do move_input.y = -1
-	if key_down[.A] do move_input.x = -1
-	else if key_down[.D] do move_input.x = 1
-
-	look_input: Vec2 = -mouse_move * LOOK_SENSITIVITY
-	g.camera.look += look_input
-	g.camera.look.x = math.wrap(g.camera.look.x, 360)
-	g.camera.look.y = math.clamp(g.camera.look.y, -89, 89)
-
-	look_mat := linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(g.camera.look.x), to_radians(g.camera.look.y), 0)
-	forward := ( look_mat * Vec4 {0,0,-1,1} ).xyz
-	right := ( look_mat * Vec4 {1,0,0,1} ).xyz
-
-
-	move_dir := forward * move_input.y + right * move_input.x
-
-	motion := linalg.normalize0(move_dir) * g.player.move_speed * g.dt
-	g.camera.position += motion
-
-	g.camera.target = g.camera.position + forward
-}
-
-//shake the camera by setting the trauma
-shake_camera :: proc(trauma: f32){
-	g.camera.camera_shake.trauma = trauma
-}
-
-
-// 
-// CAMERA SHAKE
-// 
-
-Camera_shake :: struct {
-	trauma: f32,
-	depletion: f32,
-	pos_offset: Vec2,
-	rot_offset: f32, // in radians
-	seed: i64,
-	time_offset: Vec2,
-}
-
-init_camera_shake :: proc(){
-	g.camera.camera_shake = Camera_shake{
-		trauma = 0,
-		depletion = 8,
-		pos_offset = { 0,0 },
-		rot_offset = 0,
-		seed = 223492,
-		time_offset = { 5,5 }
-	}
-}
-
-update_camera_shake :: proc(){
-	cs := &g.camera.camera_shake
-	if cs.trauma <= 0{
-		cs.pos_offset = { 0,0 }
-		cs.rot_offset = 0
-		cs.trauma = 0
-	} else {
-		seedpos := noise.Vec2{f64(cs.time_offset.x * g.runtime), f64(cs.time_offset.y * g.runtime)}
-
-		cs.pos_offset = Vec2{noise.noise_2d(cs.seed, seedpos), noise.noise_2d(cs.seed + 1, seedpos)}
-		cs.pos_offset /= 45
-		cs.pos_offset *= cs.trauma * cs.trauma
-		cs.rot_offset = noise.noise_2d(cs.seed+2, seedpos)
-		cs.rot_offset /= 100
-		cs.rot_offset *= cs.trauma * cs.trauma * cs.trauma
-
-		cs.trauma -= cs.depletion * g.dt
-	}
-}
 
