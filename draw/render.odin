@@ -1,0 +1,299 @@
+package draw
+
+
+import "base:intrinsics"
+import "base:runtime"
+import "core:log"
+import "core:strings"
+import "core:math"
+import "core:math/linalg"
+import "core:math/noise"
+import "core:math/ease"
+import "core:math/rand"
+import "core:mem"
+import "core:os"
+import "core:sort"
+import "core:fmt"
+import sg "../../sokol/gfx"
+import sapp "../../sokol/app"
+import shelpers "../../sokol/helpers"
+// stb
+import stbi "vendor:stb/image"
+import stbtt "vendor:stb/truetype"
+
+import "../utils"
+import "../user"
+
+//draw call data
+Draw_data :: struct{
+	m: Matrix4,
+	b: sg.Bindings,
+	// the draw_priority of an obj, basically just says higher draw_priority, draw last(on top)
+	draw_priority: i32,
+}
+
+Rendering_globals :: struct {
+	//graphics stuff
+	shader: sg.Shader,
+	pipeline: sg.Pipeline,
+	index_buffer: sg.Buffer,	
+	sampler: sg.Sampler,
+	//assumes the correct screen origin to be top left
+	inverse_screen_y: bool,
+	reverse_screen_y: int,
+}
+
+// Handle multiple objects
+Sprite_object :: struct{
+	pos: Vec3,
+	rot: Vec3,
+	img: sg.Image,
+	draw_priority: i32,
+	vertex_buffer: sg.Buffer,
+	size: Vec2,
+}
+
+Sprite_object_group :: struct{
+	objects: [dynamic]Sprite_object,
+}
+
+// the vertex data
+Vertex_data :: struct{
+	pos: Vec3,
+	col: sg.Color,
+	uv: Vec2,
+	tex_index: u8,
+}
+
+Vertex_buffer_data :: struct{
+	uv_data: Vec4,
+	size_data: Vec2,
+	color_data: sg.Color,
+	tex_index_data: u8,
+	buffer: sg.Buffer,
+}
+
+
+
+
+Images :: struct{
+	filename: cstring,
+	image: sg.Image,
+}
+
+
+
+//global vars
+Globals :: struct {
+	//Sprite_objects for drawing
+	text_objects: map[string]Text_object,
+	objects: map[string]Sprite_object_group,
+	//Things there are only one of
+	//used to avoid initing multiple of the same buffer
+	vertex_buffers: [dynamic]Vertex_buffer_data,
+	//used to avoid initing mutiple of the same img
+	images: [dynamic]Images,
+
+	fonts: map[string]FONT_INFO,
+}
+
+Uniforms_vs_data :: struct{
+	model_matrix: Mat4,
+	veiw_matrix: Mat4,
+	projection_matrix: Mat4,
+	scz: Vec2,
+	reverse_screen_y: int,
+	lights_pos: [3]Vec4,
+}
+
+
+backends_with_bottom_left_screen_origins: [3]sg.Backend : {.GLCORE, .GLES3, .WGPU}
+
+
+rg: ^Rendering_globals
+
+g: ^Globals
+
+init_draw_state :: proc(){
+
+	rg = new(Rendering_globals)
+
+	g = new(Globals)
+
+	init_camera()
+
+	//different rendering backends have top left or bottom left as the screen origin
+	rg.inverse_screen_y = false
+	rg.reverse_screen_y = 1
+	if utils.contains(backends_with_bottom_left_screen_origins, sg.query_backend()){
+		rg.inverse_screen_y = true
+		rg.reverse_screen_y = -1;
+	}
+
+	//white image for scuffed rect rendering
+	WHITE_IMAGE = get_image(WHITE_IMAGE_PATH)
+
+
+	//make the shader and pipeline
+	rg.shader = sg.make_shader(user.main_shader_desc(sg.query_backend()))
+	pipeline_desc : sg.Pipeline_Desc = {
+		shader = rg.shader,
+		layout = {
+			//different attributes
+			attrs = {
+			user.ATTR_main_pos = { format = .FLOAT3 },
+			user.ATTR_main_col = { format = .FLOAT4 },
+			user.ATTR_main_uv = { format = .FLOAT2 },
+			user.ATTR_main_bytes0 = { format = .UBYTE4N },
+			}
+		},
+		
+		// specify that we want to use index buffer
+		index_type = .UINT16,
+		//make it so objects draw based on distance from camera
+		//depth = {
+		//	write_enabled = true,
+		//	compare = .LESS_EQUAL
+		//},
+	}
+	
+	//the blend state for working with alphas
+	blend_state : sg.Blend_State = {
+		enabled = true,
+		src_factor_rgb = .SRC_ALPHA,
+		dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
+		op_rgb = .ADD,
+		src_factor_alpha = .ONE,
+		dst_factor_alpha = .ONE_MINUS_SRC_ALPHA,
+		op_alpha = .ADD,
+	}
+	
+	pipeline_desc.colors[0] = { blend = blend_state}
+	rg.pipeline = sg.make_pipeline(pipeline_desc)
+
+	// indices
+	indices := []u16 {
+		0, 1, 2,
+		2, 1, 3,
+	}
+	// index buffer
+	rg.index_buffer = sg.make_buffer({
+		type = .INDEXBUFFER,
+		data = utils.sg_range(indices),
+	})
+
+	//create the sampler
+	rg.sampler = sg.make_sampler({})
+
+
+}
+
+draw_draw_state :: proc(){
+	
+	//
+	// rendering	
+	//
+
+	//projection matrix
+	p := linalg.matrix4_perspective_f32(70, utils.screen_size.x / utils.screen_size.y, 0.0001, 1000)
+	//view matrix
+	v := linalg.matrix4_look_at_f32(camera.position, camera.target, {camera.rotation, 1, 0})
+
+	sg.begin_pass({ swapchain = shelpers.glue_swapchain()})
+
+	//apply the pipeline to the sokol graphics
+	sg.apply_pipeline(rg.pipeline)
+
+	draw_data: [dynamic]Draw_data
+
+	//do things for all text objects
+	for id in g.text_objects {
+		for obj in g.text_objects[id].objects{
+
+			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
+			//model matrix turns vertex positions into world space positions
+			m := linalg.matrix4_translate_f32(pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
+	
+	
+			b := sg.Bindings {
+				vertex_buffers = { 0 = obj.vertex_buffer },
+				index_buffer = rg.index_buffer,
+				images = { user.IMG_tex = obj.img },
+				samplers = { user.SMP_smp = rg.sampler },
+			}
+
+			append(&draw_data, Draw_data{
+				m = m,
+				b = b,
+				draw_priority = g.text_objects[id].draw_priority,
+			})
+		}
+	}
+
+	//do things for all objects
+	for id in g.objects {
+		for obj in g.objects[id].objects{
+			
+			//model matrix turns vertex positions into world space positions
+			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
+	
+			b := sg.Bindings {
+				vertex_buffers = { 0 = obj.vertex_buffer },
+				index_buffer = rg.index_buffer,
+				images = { user.IMG_tex = obj.img },
+				samplers = { user.SMP_smp = rg.sampler },
+			}
+
+			append(&draw_data, Draw_data{
+				m = m,
+				b = b,
+				draw_priority = obj.draw_priority,
+			})
+		}	
+	}
+
+	//sort the array based on draw_priority so we can chose which things we want to be drawn over other, higher draw priority means that it gets drawn after(on top)
+	sort.quick_sort_proc(draw_data[:], compare_draw_data_draw_priority)
+
+	for drt in draw_data {
+		sg.apply_bindings(drt.b)
+
+		//apply uniforms
+		sg.apply_uniforms(user.UB_Uniforms_Data, utils.sg_range(&Uniforms_vs_data{
+			model_matrix = drt.m,
+			veiw_matrix = v,
+			projection_matrix = p,
+			scz = utils.screen_size,
+			reverse_screen_y = rg.reverse_screen_y,
+			lights_pos = {{2, 1, 0, 0}, {0.4, 0.2, 0, 0}, {4, 3, 0, 0}}
+		}))
+
+		sg.draw(0, 6, 1)
+	}
+
+	sg.end_pass()
+
+	sg.commit()
+
+}
+
+draw_cleanup :: proc(){
+	// DESTROY!!!
+	for buffer in g.vertex_buffers{
+		sg.destroy_buffer(buffer.buffer)
+	}
+
+	for image in g.images{
+		sg.destroy_image(image.image)
+	}
+
+	sg.destroy_sampler(rg.sampler)
+	sg.destroy_buffer(rg.index_buffer)
+	sg.destroy_pipeline(rg.pipeline)
+	sg.destroy_shader(rg.shader)
+
+	//free the global vars
+	free(g)
+	free(rg)
+}
+

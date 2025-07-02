@@ -2,8 +2,8 @@
 //  TODO: having some issues on window resize on linux 
 // 
 
-@header package main
-@header import sg "../sokol/gfx"
+@header package user
+@header import sg "../../sokol/gfx"
 
 @ctype mat4 Mat4
 
