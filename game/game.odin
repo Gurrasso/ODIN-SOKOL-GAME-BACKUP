@@ -531,4 +531,3 @@ camera_follow_player :: proc(lookahead: f32 = 0){
 	draw.camera_follow(gs.player.transform.pos, lookahead, gs.player.look_dir)
 }
 
-
