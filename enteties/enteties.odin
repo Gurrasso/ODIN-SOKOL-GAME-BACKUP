@@ -1,5 +1,6 @@
 package enteties
 
+import "base:intrinsics"
 import ecs "../lib/odin-ecs"
 import "core:log"
 

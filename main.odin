@@ -72,33 +72,18 @@ package main
 import "base:intrinsics"
 import "base:runtime"
 import "core:log"
-import "core:strings"
-import "core:math"
-import "core:math/linalg"
-import "core:math/noise"
-import "core:math/ease"
-import "core:math/rand"
-import "core:mem"
 import "core:os"
-import "core:sort"
-import "core:fmt"
-// stb
-import stbi "vendor:stb/image"
-import stbtt "vendor:stb/truetype"
+import "core:math/linalg"
 // sokol imports
 import sapp "../sokol/app"
 import shelpers "../sokol/helpers"
 import sg "../sokol/gfx"
-import sglue "../sokol/glue"
-//ecs
-import ecs "./lib/odin-ecs"
 
 import "utils"
 import "draw"
-import cu "utils/color"
-import enteties "enteties"
 import "game"
 import "events"
+import "enteties"
 
 Spring :: struct{
 	//where the spring is attached
@@ -181,12 +166,6 @@ cleanup_cb :: proc "c" (){
 	context = default_context
 	
 	draw.draw_cleanup()
-
-	//free the global vars
-
-	free(game.gs)
-	free(draw.g)
-	free(draw.rg)
 
 	free_all()
 
@@ -271,20 +250,3 @@ init_icon :: proc(imagefile: cstring){
 	}
 	sapp.set_icon(icon_desc)
 }
-
-
-// =================
-//    :LIGHTING
-// =================
-
-Light :: struct{
-	pos: Vec2,
-	size: f32,
-	color: sg.Color,
-}
-
-init_light :: proc(pos: Vec2 = {0, 0}, size: f32 = 1, color: sg.Color = {1, 1, 1, 1}){
-	
-}
-
-

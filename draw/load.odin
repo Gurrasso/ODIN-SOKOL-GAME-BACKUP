@@ -1,24 +1,13 @@
 #+feature dynamic-literals
 package draw
 
-import "base:intrinsics"
-import "base:runtime"
 import "core:log"
-import "core:strings"
-import "core:math"
-import "core:math/linalg"
-import "core:math/noise"
-import "core:math/ease"
-import "core:math/rand"
 import "core:mem"
 import "core:os"
-import "core:sort"
-import "core:fmt"
 import sg "../../sokol/gfx"
 import sapp "../../sokol/app"
 // stb
 import stbi "vendor:stb/image"
-import stbtt "vendor:stb/truetype"
 
 import utils "../utils"
 

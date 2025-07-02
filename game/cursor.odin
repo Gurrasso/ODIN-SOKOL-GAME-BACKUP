@@ -6,8 +6,6 @@ import "../events"
 
 // CURSOR
 
-cursor: Cursor
-
 Cursor :: struct{
 	transform: Transform,	
 	world_transform: Transform,
@@ -19,7 +17,7 @@ Cursor :: struct{
 }
 
 init_cursor :: proc(){
-	cursor = Cursor{
+	gs.cursor = Cursor{
 		transform = Transform{
 			pos = {1, 0},
 			size = {24, 24}, // in pixels
@@ -34,31 +32,31 @@ init_cursor :: proc(){
 		lookahead = 13,
 	}
 
-	cursor.transform.size = draw.get_pixel_size_in_world(cursor.transform.size, 0)
+	gs.cursor.transform.size = draw.get_pixel_size_in_world(gs.cursor.transform.size, 0)
 
-	cursor.sprite_id = draw.init_sprite(
-		filename = cursor.filename, 
-		transform = cursor.transform,
+	gs.cursor.sprite_id = draw.init_sprite(
+		filename = gs.cursor.filename, 
+		transform = gs.cursor.transform,
 		draw_priority = .cursor
 	)
 }
 
 update_cursor :: proc(){
-	cursor.transform.pos += (Vec2{events.mouse_move.x, -events.mouse_move.y} * cursor.sensitivity) * utils.dt
+	gs.cursor.transform.pos += (Vec2{events.mouse_move.x, -events.mouse_move.y} * gs.cursor.sensitivity) * utils.dt
 	check_cursor_collision()
-	cursor.world_transform = Transform{
-		pos = (draw.camera.position.xy-draw.camera.camera_shake.pos_offset) + cursor.transform.pos,
-		size = cursor.transform.size,
-		rot = cursor.transform.rot,
+	gs.cursor.world_transform = Transform{
+		pos = (draw.camera.position.xy-draw.camera.camera_shake.pos_offset) + gs.cursor.transform.pos,
+		size = gs.cursor.transform.size,
+		rot = gs.cursor.transform.rot,
 	}
-	if events.listen_screen_resized() do draw.update_sprite_size(size = cursor.world_transform.size, id = cursor.sprite_id)
-	draw.update_sprite(transform = cursor.world_transform, id = cursor.sprite_id)
+	if events.listen_screen_resized() do draw.update_sprite_size(size = gs.cursor.world_transform.size, id = gs.cursor.sprite_id)
+	draw.update_sprite(transform = gs.cursor.world_transform, id = gs.cursor.sprite_id)
 }
 
 //check the cursor collision with the screen
 check_cursor_collision :: proc (){
 
-	transform := &cursor.transform
+	transform := &gs.cursor.transform
 	pos := &transform.pos
 	size := transform.size
 

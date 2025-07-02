@@ -1,17 +1,11 @@
 package game
 
 
-import "base:intrinsics"
 import "core:log"
 import "core:math"
 import "core:math/linalg"
-import "core:math/noise"
-import "core:math/ease"
-import "core:math/rand"
-// sokol imports
 import sapp "../../sokol/app"
 import sg "../../sokol/gfx"
-
 import "../utils"
 import "../draw"
 import cu "../utils/color"
