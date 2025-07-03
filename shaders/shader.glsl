@@ -1,3 +1,6 @@
+//
+// TODO: seg fault when adding more in and out in vs and fs. Maybe try placing array at top of in/out
+//
 @header package user
 @header import sg "../../sokol/gfx"
 
