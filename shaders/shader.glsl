@@ -1,11 +1,8 @@
-// 
-//  TODO: having some issues on window resize on linux 
-// 
-
 @header package user
 @header import sg "../../sokol/gfx"
 
 @ctype mat4 Mat4
+@ctype vec4 Vec4
 
 // :VERTEX SHADER
 
@@ -23,7 +20,9 @@ layout(binding=0) uniform Uniforms_Data {
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
-	vec4[16] lights_pos;
+	vec4[16] lights_transform_data;
+	vec4[16] lights_color_data;
+	
 };
 
 
@@ -31,7 +30,7 @@ layout(binding=0) uniform Uniforms_Data {
 out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
-out vec2 screen_size;
+
 out vec4[16] lights;
 
 vec2 world_to_screen_pos(vec2 pos){
@@ -43,22 +42,22 @@ vec2 world_to_screen_pos(vec2 pos){
 void main() {
 	//model_view_projection matrix for the objects
 	mat4 mvp = projection_matrix*view_matrix*model_matrix;
-	gl_Position = mvp*vec4(pos, 1);
 	color = col;
 	texcoord = uv;
 	bytes = bytes0;
-	screen_size = scz;
 
 	vec4[16] lights_pos0;
-	float[16] lights_sizes0;
 
 	for (int i = 0; i < 16; i ++){
-		lights_pos0[i].xy = world_to_screen_pos(lights_pos[i].xy);
-		lights_pos0[i].w = lights_pos[i].w;
-		lights_pos0[i].z = lights_pos[i].z;
+		lights_pos0[i].xy = world_to_screen_pos(lights_transform_data[i].xy);
+		lights_pos0[i].w = lights_transform_data[i].w;
+		lights_pos0[i].z = lights_transform_data[i].z;
 	}
 
 	lights = lights_pos0;
+
+
+	gl_Position = mvp*vec4(pos, 1);
 }
 
 @end
@@ -73,7 +72,7 @@ void main() {
 in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
-in vec2 screen_size;
+
 in vec4[16] lights;
 
 layout(binding=0) uniform texture2D tex;
@@ -87,7 +86,7 @@ vec4 tex_col = vec4(1.0);
 void update_lighting(){
 	for(int i = 0; i < lights[0].w; i++){
 		float dist = length(gl_FragCoord.xy-lights[i].xy);
-		vec3 lightColor = rgb_to_sg_color(vec3(253, 255, 199));
+		vec3 lightColor = vec3(1,1,1);
 		float lightRadius = lights[i].z; // in screen pixels
 
 		float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);

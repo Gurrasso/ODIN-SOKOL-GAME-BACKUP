@@ -11,6 +11,7 @@ import shelpers "../../sokol/helpers"
 
 import "../utils"
 import "../user"
+import cutils "../utils/color"
 
 //draw call data
 Draw_data :: struct{
@@ -91,8 +92,11 @@ Uniforms_vs_data :: struct{
 	projection_matrix: Mat4,
 	scz: Vec2,
 	reverse_screen_y: int,
-	lights_pos: [16]Vec4,
+	lights_transform_data: [lights_data_size ]Vec4,
+	lights_color_data: [lights_data_size]Vec4
 }
+
+lights_data_size: int : 16
 
 
 backends_with_bottom_left_screen_origins: [3]sg.Backend : {.GLCORE, .GLES3, .WGPU}
@@ -246,15 +250,15 @@ draw_draw_state :: proc(){
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
 
-		lights_positions_dynamic: [dynamic]Vec4
-		lights_positions: [16]Vec4
+		lights_transform_data: [lights_data_size]Vec4
+		lights_color_data: [lights_data_size]Vec4
+		lightsinc: int
 		for id, val in g.lights{
-			append(&lights_positions_dynamic, Vec4{val.pos.x, val.pos.y, world_to_screen_size(val.size), 0})
+			lights_transform_data[lightsinc] = Vec4{val.pos.x, val.pos.y, world_to_screen_size(val.size), auto_cast len(g.lights)}
+			lights_color_data[lightsinc] = cutils.sg_color_to_vec4(val.color)
+			lightsinc += 1
 		}
-		for i := 0; i < len(lights_positions_dynamic); i += 1{
-			lights_positions[i].xyz = lights_positions_dynamic[i].xyz
-			lights_positions[i].w = auto_cast len(lights_positions_dynamic)
-		}
+		
 
 		//apply uniforms
 		sg.apply_uniforms(user.UB_Uniforms_Data, utils.sg_range(&Uniforms_vs_data{
@@ -263,7 +267,8 @@ draw_draw_state :: proc(){
 			projection_matrix = p,
 			scz = utils.screen_size,
 			reverse_screen_y = rg.reverse_screen_y,
-			lights_pos = lights_positions,
+			lights_transform_data = lights_transform_data,
+			lights_color_data = lights_color_data,
 		}))
 
 		sg.draw(0, 6, 1)

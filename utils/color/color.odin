@@ -35,3 +35,7 @@ sg_color_from_rgb :: proc (color3: Vec3) -> sg.Color{
 	return new_color
 
 }
+
+sg_color_to_vec4 :: proc(c: sg.Color) -> Vec4{
+	return {c.r, c.g, c.b, c.a}
+}
