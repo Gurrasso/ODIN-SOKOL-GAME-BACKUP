@@ -74,14 +74,14 @@ Images :: struct{
 //global vars
 Globals :: struct {
 	//Sprite_objects for drawing
-	text_objects: map[string]Text_object,
-	objects: map[string]Sprite_object_group,
-	//Things there are only one of
+	text_objects: map[Sprite_id]Text_object,
+	objects: map[Sprite_id]Sprite_object_group,
+	lights: map[Light_id]Light,
 	//used to avoid initing multiple of the same buffer
 	vertex_buffers: [dynamic]Vertex_buffer_data,
 	//used to avoid initing mutiple of the same img
 	images: [dynamic]Images,
-
+	
 	fonts: map[string]FONT_INFO,
 }
 
@@ -91,7 +91,7 @@ Uniforms_vs_data :: struct{
 	projection_matrix: Mat4,
 	scz: Vec2,
 	reverse_screen_y: int,
-	lights_pos: [3]Vec4,
+	lights_pos: [16]Vec4,
 }
 
 
@@ -241,10 +241,20 @@ draw_draw_state :: proc(){
 	}
 
 	//sort the array based on draw_priority so we can chose which things we want to be drawn over other, higher draw priority means that it gets drawn after(on top)
-	sort.quick_sort_proc(draw_data[:], compare_draw_data_draw_priority)
+	sort.merge_sort_proc(draw_data[:], compare_draw_data_draw_priority)
 
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
+
+		lights_positions_dynamic: [dynamic]Vec4
+		lights_positions: [16]Vec4
+		for id, val in g.lights{
+			append(&lights_positions_dynamic, Vec4{val.pos.x, val.pos.y, world_to_screen_size(val.size), 0})
+		}
+		for i := 0; i < len(lights_positions_dynamic); i += 1{
+			lights_positions[i].xyz = lights_positions_dynamic[i].xyz
+			lights_positions[i].w = auto_cast len(lights_positions_dynamic)
+		}
 
 		//apply uniforms
 		sg.apply_uniforms(user.UB_Uniforms_Data, utils.sg_range(&Uniforms_vs_data{
@@ -253,7 +263,7 @@ draw_draw_state :: proc(){
 			projection_matrix = p,
 			scz = utils.screen_size,
 			reverse_screen_y = rg.reverse_screen_y,
-			lights_pos = {{2, 1, 0, 0}, {0.4, 0.2, 0, 0}, {4, 3, 0, 0}}
+			lights_pos = lights_positions,
 		}))
 
 		sg.draw(0, 6, 1)

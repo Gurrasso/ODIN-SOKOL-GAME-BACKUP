@@ -49,6 +49,8 @@ init_game_state :: proc(){
 
 	init_player()	
 
+	draw.init_light(pos = {1, 2})
+
 
 	draw.init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	

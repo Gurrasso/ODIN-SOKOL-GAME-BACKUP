@@ -23,7 +23,7 @@ layout(binding=0) uniform Uniforms_Data {
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
-	vec4[3] lights_pos;
+	vec4[16] lights_pos;
 };
 
 
@@ -32,7 +32,13 @@ out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
 out vec2 screen_size;
-out vec2[3] lights;
+out vec4[16] lights;
+
+vec2 world_to_screen_pos(vec2 pos){
+	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
+	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
+	return (ndcpos.xy*0.5+0.5)*scz;
+}
 
 void main() {
 	//model_view_projection matrix for the objects
@@ -43,16 +49,16 @@ void main() {
 	bytes = bytes0;
 	screen_size = scz;
 
-	vec2[3] lights_pos0;
+	vec4[16] lights_pos0;
+	float[16] lights_sizes0;
 
-	for(int i = 0; i < lights_pos.length(); i++){
-		vec4 clippos = (projection_matrix*view_matrix) * vec4(lights_pos[i].x, lights_pos[i].y, 0, 1);
-		vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
-		lights_pos0[i] = (ndcpos.xy*0.5+0.5)*scz;
-		lights = lights_pos0;
+	for (int i = 0; i < 16; i ++){
+		lights_pos0[i].xy = world_to_screen_pos(lights_pos[i].xy);
+		lights_pos0[i].w = lights_pos[i].w;
+		lights_pos0[i].z = lights_pos[i].z;
 	}
 
-
+	lights = lights_pos0;
 }
 
 @end
@@ -68,7 +74,7 @@ in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
 in vec2 screen_size;
-in vec2[3] lights;
+in vec4[16] lights;
 
 layout(binding=0) uniform texture2D tex;
 // sampler specifies things
@@ -79,10 +85,10 @@ out vec4 frag_color;
 vec4 tex_col = vec4(1.0);
 
 void update_lighting(){
-	for(int i = 0; i < lights.length(); i++){
+	for(int i = 0; i < lights[0].w; i++){
 		float dist = length(gl_FragCoord.xy-lights[i].xy);
 		vec3 lightColor = rgb_to_sg_color(vec3(253, 255, 199));
-		float lightRadius = 20; // in screen pixels
+		float lightRadius = lights[i].z; // in screen pixels
 
 		float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
   	attenuation = pow(attenuation, 2.0);

@@ -254,6 +254,23 @@ update_camera_shake :: proc(){
 	}
 }
 
+
+world_to_screen_pos :: proc(pos: Vec2) -> Vec2{
+	//projection matrix
+	projection_matrix := linalg.matrix4_perspective_f32(70, utils.screen_size.x / utils.screen_size.y, 0.0001, 1000)
+	//view matrix
+	view_matrix := linalg.matrix4_look_at_f32(camera.position, camera.target, {camera.rotation, 1, 0})
+
+	clippos := (projection_matrix*view_matrix) * Vec4{pos.x, pos.y, 0, 1};
+	ndcpos := Vec2{clippos.x/clippos.w, (-clippos.y * auto_cast rg.reverse_screen_y)/ clippos.w};
+	return (ndcpos.xy*0.5+0.5)*utils.screen_size;
+}
+
+world_to_screen_size :: proc(size: f32) -> f32{
+	new_size := world_to_screen_pos({camera.position.x+size, camera.position.y}).x
+	return new_size - (utils.screen_size.x/2)
+}
+
 //convert a point on the screen at a certain z pos to a world pos
 screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 
