@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	make lighting have a little effect durin "day",
+
 	use uuid:s,
 
 	maybe try and implement everything as an entity,

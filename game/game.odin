@@ -49,8 +49,8 @@ init_game_state :: proc(){
 
 	draw.set_world_brightness(0.4)
 
-	draw.init_light(pos = {1, 3}, size = 6, intensity = 1.3, color = {0.2, 1, 1, 1})
-	draw.init_light(pos = {2, -2}, size = 3.5, color = {1, 0.2, 0.6, 1})
+	draw.init_light(pos = {1, 3}, size = 6, intensity = 2, color = {0.2, 1, 1, 1})
+	draw.init_light(pos = {2, -2}, size = 3.5, intensity = 1.5, color = {1, 0.6, 0, 1})
 
 	draw.init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
