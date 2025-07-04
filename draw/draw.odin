@@ -18,8 +18,19 @@ Transform :: utils.Transform
 
 DEFAULT_TRANSFORM :: utils.DEFAULT_TRANSFORM
 
+// Handle multiple objects
+Sprite_object :: struct{
+	pos: Vec3,
+	rot: Vec3,
+	img: sg.Image,
+	draw_priority: i32,
+	vertex_buffer: sg.Buffer,
+	size: Vec2,
+}
 
-
+Sprite_object_group :: struct{
+	objects: [dynamic]Sprite_object,
+}
 
 // =============
 //   :DRAWING
@@ -65,11 +76,11 @@ init_sprite_from_img :: proc(
 
 	buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
 
-	if id in g.objects == false{
-		g.objects[id] = Sprite_object_group{}
+	if id in g.sprite_objects == false{
+		g.sprite_objects[id] = Sprite_object_group{}
 	}
 
-	object_group := &g.objects[id]
+	object_group := &g.sprite_objects[id]
 
 	append(&object_group.objects, Sprite_object{
 		utils.vec2_to_vec3(transform.pos),
@@ -104,9 +115,9 @@ update_sprite :: proc{
 }
 
 update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: Sprite_id){
-	assert(id in g.objects)
+	assert(id in g.sprite_objects)
 
-	for &object in g.objects[id].objects{
+	for &object in g.sprite_objects[id].objects{
 		object = Sprite_object{
 			utils.vec2_to_vec3(transform.pos),
 			transform.rot,
@@ -119,9 +130,9 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: S
 }
 
 update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
-	assert(id in g.objects)
+	assert(id in g.sprite_objects)
 
-	for &object in g.objects[id].objects{
+	for &object in g.sprite_objects[id].objects{
 
 		object = Sprite_object{
 			object.pos,
@@ -136,9 +147,9 @@ update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 
 update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 
-	assert(id in g.objects)
+	assert(id in g.sprite_objects)
 
-	for &object in g.objects[id].objects{
+	for &object in g.sprite_objects[id].objects{
 
 		object = Sprite_object{
 			utils.vec2_to_vec3(transform.pos),
@@ -153,9 +164,9 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 
 update_sprite_size :: proc(size: Vec2, id: Sprite_id){
 
-	assert(id in g.objects)
+	assert(id in g.sprite_objects)
 
-	for &object in g.objects[id].objects{
+	for &object in g.sprite_objects[id].objects{
 		//update the vertex buffer
 		if object.size != size{
 			update_vertex_buffer_size(object.vertex_buffer, size)
@@ -487,12 +498,12 @@ update_text_pos :: proc(pos: Vec2, id: string){
 }
 
 
-//removing objects
+//removing.sprite_objects
 
 remove_object ::	proc(id: Sprite_id){
-	assert(id in g.objects)
+	assert(id in g.sprite_objects)
 
-	delete_key(&g.objects, id)
+	delete_key(&g.sprite_objects, id)
 }
 
 remove_text_object :: proc(id: string) {

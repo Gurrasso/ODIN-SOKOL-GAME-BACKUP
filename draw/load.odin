@@ -11,6 +11,28 @@ import stbi "vendor:stb/image"
 
 import utils "../utils"
 
+
+// the vertex data
+Vertex_data :: struct{
+	pos: Vec3,
+	col: sg.Color,
+	uv: Vec2,
+	tex_index: u8,
+}
+
+Vertex_buffer_data :: struct{
+	uv_data: Vec4,
+	size_data: Vec2,
+	color_data: sg.Color,
+	tex_index_data: u8,
+	buffer: sg.Buffer,
+}
+
+Images :: struct{
+	filename: cstring,
+	image: sg.Image,
+}
+
 // ==================
 //   :IMAGE THINGS
 // ==================

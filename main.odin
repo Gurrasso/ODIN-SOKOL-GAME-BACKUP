@@ -84,6 +84,7 @@ import "draw"
 import "game"
 import "events"
 import "enteties"
+import "utils/cooldown"
 
 Spring :: struct{
 	//where the spring is attached
@@ -186,6 +187,8 @@ frame_cb :: proc "c" (){
 	context = default_context
 	
 	utils.update_utils()
+
+	cooldown.update_cooldowns()
 
 	if events.screen_resized do utils.screen_size = Vec2{sapp.widthf(), sapp.heightf()}
 

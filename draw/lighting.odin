@@ -36,6 +36,11 @@ init_light :: proc(
 	return id
 }
 
+delete_light :: proc(id: Light_id){
+	assert(id in g.lights)
+	delete_key(&g.lights, id)
+}
+
 //generates the lighting data that is to be passed to the fragment shader
 generate_lighting_uniforms_data :: proc() -> ([LIGHTS_DATA_SIZE]Vec4, [LIGHTS_DATA_SIZE]Vec4){
 	lights_transform_data: [LIGHTS_DATA_SIZE]Vec4

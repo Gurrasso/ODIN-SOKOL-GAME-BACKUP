@@ -1,8 +1,8 @@
-package game
+package cooldown
 
 import "core:log"
 
-import "../utils"
+import "../../utils"
 
 
 //the cooldown id
@@ -15,10 +15,12 @@ Cooldown_object :: struct{
 	duration: f32,
 }
 
+cooldowns: map[Cooldown]Cooldown_object
+
 //updates all the cooldowns
 update_cooldowns :: proc(){
-	for id in gs.cooldowns{
-		cooldown_object := &gs.cooldowns[id]
+	for id in cooldowns{
+		cooldown_object := &cooldowns[id]
 		if cooldown_object.enabled{
 			cooldown_object.duration += utils.dt
 			
@@ -31,22 +33,22 @@ update_cooldowns :: proc(){
 }
 
 cooldown_enabled :: proc(id: Cooldown) -> bool{
-	return gs.cooldowns[id].enabled
+	return cooldowns[id].enabled
 }
 
 //starts the cooldown
 start_cooldown :: proc(id: Cooldown){
-	assert(id in gs.cooldowns)
-	cooldown_object := &gs.cooldowns[id]
+	assert(id in cooldowns)
+	cooldown_object := &cooldowns[id]
 
 	cooldown_object.enabled = true
 }
 
 //creates the cooldown object and gives the id
 init_cooldown_object :: proc(cooldown: f32) -> Cooldown{
-	id := utils.generate_map_u32_id(gs.cooldowns)
+	id := utils.generate_map_u32_id(cooldowns)
 
-	gs.cooldowns[id] = Cooldown_object{
+	cooldowns[id] = Cooldown_object{
 		cooldown = cooldown,
 	}
 	

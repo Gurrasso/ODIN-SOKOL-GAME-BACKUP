@@ -11,6 +11,7 @@ import "../draw"
 import cu "../utils/color"
 import es "../enteties"
 import "../events"
+import "../utils/cooldown"
 
 
 //COMPONENTS
@@ -32,7 +33,7 @@ update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: strin
 //projectile weapon
 Projectile_weapon :: struct{
 	//id of the cooldown object that is linked to this weapon
-	cooldown_object: Cooldown,
+	cooldown_object: cooldown.Cooldown,
 	//cooldown of the weapon
 	cooldown: f32,
 	//shoot button
@@ -53,7 +54,7 @@ Projectile_weapon :: struct{
 
 //init function that runs when the item holder inits with a projectile weapon or when a projectile weapon is given to an item holder
 init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
-	weapon.cooldown_object = init_cooldown_object(weapon.cooldown)	
+	weapon.cooldown_object = cooldown.init_cooldown_object(weapon.cooldown)	
 }
 
 reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
@@ -65,12 +66,12 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 	//add a projectile to the array if you press the right trigger
 	should_shoot: bool
 	
-	if cooldown_enabled(weapon.cooldown_object) do should_shoot = false
+	if cooldown.cooldown_enabled(weapon.cooldown_object) do should_shoot = false
 	else if !weapon.automatic do should_shoot = events.listen_mouse_single_down(weapon.trigger)
 	else do should_shoot = events.listen_mouse_down(weapon.trigger)
 
 	if should_shoot{
-		start_cooldown(weapon.cooldown_object)
+		cooldown.start_cooldown(weapon.cooldown_object)
 		for i := 0; i < weapon.shots; i += 1{
 						
 			sprite_id := utils.generate_string_id()

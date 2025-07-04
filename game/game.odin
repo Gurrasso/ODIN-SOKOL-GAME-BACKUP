@@ -26,7 +26,6 @@ import events "../events"
 Game_state :: struct{
 	background_sprite: Sprite_id,
 	projectiles: [dynamic]Projectile,
-	cooldowns: map[Cooldown]Cooldown_object,
 	player: Player,
 	cursor: Cursor,
 }
@@ -80,7 +79,6 @@ update_game_state :: proc(){
 	event_listener()
 
 	update_projectiles(&gs.projectiles)
-	update_cooldowns()
 	//move_camera_3D()
 	update_player()
 	

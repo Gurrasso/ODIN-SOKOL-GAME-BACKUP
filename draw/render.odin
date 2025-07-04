@@ -32,51 +32,11 @@ Rendering_globals :: struct {
 	reverse_screen_y: int,
 }
 
-// Handle multiple objects
-Sprite_object :: struct{
-	pos: Vec3,
-	rot: Vec3,
-	img: sg.Image,
-	draw_priority: i32,
-	vertex_buffer: sg.Buffer,
-	size: Vec2,
-}
-
-Sprite_object_group :: struct{
-	objects: [dynamic]Sprite_object,
-}
-
-// the vertex data
-Vertex_data :: struct{
-	pos: Vec3,
-	col: sg.Color,
-	uv: Vec2,
-	tex_index: u8,
-}
-
-Vertex_buffer_data :: struct{
-	uv_data: Vec4,
-	size_data: Vec2,
-	color_data: sg.Color,
-	tex_index_data: u8,
-	buffer: sg.Buffer,
-}
-
-
-
-
-Images :: struct{
-	filename: cstring,
-	image: sg.Image,
-}
-
-
-
 //global vars
 Globals :: struct {
 	//Sprite_objects for drawing
 	text_objects: map[Sprite_id]Text_object,
-	objects: map[Sprite_id]Sprite_object_group,
+	sprite_objects: map[Sprite_id]Sprite_object_group,
 	lights: map[Light_id]Light,
 	//used to avoid initing multiple of the same buffer
 	vertex_buffers: [dynamic]Vertex_buffer_data,
@@ -231,8 +191,8 @@ draw_draw_state :: proc(){
 	}
 
 	//do things for all objects
-	for id in g.objects {
-		for obj in g.objects[id].objects{
+	for id in g.sprite_objects {
+		for obj in g.sprite_objects[id].objects{
 			
 			//model matrix turns vertex positions into world space positions
 			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
