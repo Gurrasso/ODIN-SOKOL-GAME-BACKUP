@@ -23,7 +23,6 @@ layout(binding=1) uniform Uniforms_vs_Data {
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
-	
 };
 
 
@@ -53,9 +52,6 @@ void main() {
 // :FRAGMENT SHADER
 @fs fs
 
-//Utils
-@include shader_utils.glsl
-
 // vars
 in vec4 color;
 in vec2 texcoord;
@@ -71,36 +67,20 @@ layout(binding=0) uniform Uniforms_fs_Data {
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
-	vec4[16] lights_transform_data;
-	vec4[16] lights_color_data;
-	
+	vec4[64] lights_transform_data;
+	vec4[64] lights_color_data;
+	float world_brightness;
 };
 
 
+vec4 tex_col = vec4(1.0);
+vec3 lit_col;
+
+@include shader_utils.glsl
+
+@include lighting.glsl
 
 out vec4 frag_color; 
-
-vec4 tex_col = vec4(1.0);
-
-vec2 world_to_screen_pos(vec2 pos){
-	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
-	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
-	return (ndcpos.xy*0.5+0.5)*scz;
-}
-
-void update_lighting(){
-	for(int i = 0; i < lights_transform_data[0].w; i++){
-		float dist = length(gl_FragCoord.xy-lights_transform_data[i].xy);
-		vec3 lightColor = lights_color_data[i].xyz;
-		float lightRadius = lights_transform_data[i].z; // in screen pixels
-
-		float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
-  	attenuation = pow(attenuation, 2.0);
-
-		tex_col += vec4((lightColor) * attenuation, 0);
-	}
-
-}
 
 void main() {
 
@@ -120,10 +100,10 @@ void main() {
 	}
 
 	tex_col *= color;
-
+	
 	update_lighting();
 
-	frag_color = tex_col;
+	frag_color = vec4(lit_col, tex_col.a);
 }
 
 @end

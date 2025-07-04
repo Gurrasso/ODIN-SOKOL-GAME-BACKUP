@@ -1,3 +1,9 @@
+vec2 world_to_screen_pos(vec2 pos){
+	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
+	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
+	return (ndcpos.xy*0.5+0.5)*scz;
+}
+
 vec3 rgb_to_sg_color(vec3 rgb){
 	vec3 color = rgb;
 	return color/255.0;

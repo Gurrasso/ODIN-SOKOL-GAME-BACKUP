@@ -152,7 +152,7 @@ init_cb :: proc "c" (){
 
 	WHITE_IMAGE = draw.WHITE_IMAGE
 
-	draw.init_draw_state ()
+	draw.init_draw_state()
 
 	game.init_game_state()
 }

@@ -506,4 +506,3 @@ ray_plane_intersect_z :: proc(ray_origin, ray_dir: Vec3, target_z: f32) -> Vec3 
     t := (target_z - ray_origin.z) / ray_dir.z;
     return ray_origin + ray_dir * t
 }
-

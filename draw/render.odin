@@ -84,6 +84,8 @@ Globals :: struct {
 	images: [dynamic]Images,
 	
 	fonts: map[string]FONT_INFO,
+
+	world_brightness: f32,
 }
 
 Uniforms_vs_data :: struct{
@@ -101,10 +103,9 @@ Uniforms_fs_data :: struct{
 	scz: Vec2,
 	reverse_screen_y: int,
 	lights_transform_data: [LIGHTS_DATA_SIZE]Vec4,
-	lights_color_data: [LIGHTS_DATA_SIZE]Vec4
+	lights_color_data: [LIGHTS_DATA_SIZE]Vec4,
+	world_brightness: f32,
 }
-
-LIGHTS_DATA_SIZE: int : 16
 
 
 rg: ^Rendering_globals
@@ -116,6 +117,8 @@ init_draw_state :: proc(){
 	rg = new(Rendering_globals)
 
 	g = new(Globals)
+
+	set_world_brightness(0.5)
 
 	init_camera()
 
@@ -275,6 +278,7 @@ draw_draw_state :: proc(){
 			reverse_screen_y = rg.reverse_screen_y,
 			lights_transform_data = lights_transform_data,
 			lights_color_data = lights_color_data,
+			world_brightness = g.world_brightness,
 		}))
 
 		sg.draw(0, 6, 1)
@@ -305,4 +309,3 @@ draw_cleanup :: proc(){
 	free(g)
 	free(rg)
 }
-

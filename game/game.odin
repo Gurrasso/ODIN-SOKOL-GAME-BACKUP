@@ -43,14 +43,15 @@ init_game_state :: proc(){
 	gs = new(Game_state)
 
 	init_items()
-	draw.init_rect(transform = Transform{size = {0.2, 0.2}, pos = {1, 2}}, color = {1, 0, 0, 1})
 	sapp.show_mouse(false)
 	sapp.lock_mouse(true)
 
-	init_player()	
+	init_player()
 
-	draw.init_light(pos = {1, 3}, size = 3, color = {0, 1, 0.4, 1})
-	draw.init_light(pos = {2, -3}, size = 2)
+	draw.set_world_brightness(0.16)
+
+	draw.init_light(pos = {1, 3}, size = 6, intensity = 1)
+	draw.init_light(pos = {2, -2}, size = 3.5)
 
 	draw.init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
@@ -71,7 +72,7 @@ init_game_state :: proc(){
 
 	init_cursor()
 
-	init_background({120, 120, 120})
+	init_background({130, 130, 130})
 }
 
 update_game_state :: proc(){
