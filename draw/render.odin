@@ -92,14 +92,19 @@ Uniforms_vs_data :: struct{
 	projection_matrix: Mat4,
 	scz: Vec2,
 	reverse_screen_y: int,
-	lights_transform_data: [lights_data_size ]Vec4,
-	lights_color_data: [lights_data_size]Vec4
 }
 
-lights_data_size: int : 16
+Uniforms_fs_data :: struct{
+	model_matrix: Mat4,
+	veiw_matrix: Mat4,
+	projection_matrix: Mat4,
+	scz: Vec2,
+	reverse_screen_y: int,
+	lights_transform_data: [LIGHTS_DATA_SIZE]Vec4,
+	lights_color_data: [LIGHTS_DATA_SIZE]Vec4
+}
 
-
-backends_with_bottom_left_screen_origins: [3]sg.Backend : {.GLCORE, .GLES3, .WGPU}
+LIGHTS_DATA_SIZE: int : 16
 
 
 rg: ^Rendering_globals
@@ -117,7 +122,7 @@ init_draw_state :: proc(){
 	//different rendering backends have top left or bottom left as the screen origin
 	rg.inverse_screen_y = false
 	rg.reverse_screen_y = 1
-	if utils.contains(backends_with_bottom_left_screen_origins, sg.query_backend()){
+	if !sg.query_features().origin_top_left{
 		rg.inverse_screen_y = true
 		rg.reverse_screen_y = -1;
 	}
@@ -250,18 +255,19 @@ draw_draw_state :: proc(){
 	for drt in draw_data {
 		sg.apply_bindings(drt.b)
 
-		lights_transform_data: [lights_data_size]Vec4
-		lights_color_data: [lights_data_size]Vec4
-		lightsinc: int
-		for id, val in g.lights{
-			lights_transform_data[lightsinc] = Vec4{val.pos.x, val.pos.y, world_to_screen_size(val.size), auto_cast len(g.lights)}
-			lights_color_data[lightsinc] = cutils.sg_color_to_vec4(val.color)
-			lightsinc += 1
-		}
-		
+		//apply uniforms for vertex shader
+		sg.apply_uniforms(user.UB_Uniforms_vs_Data, utils.sg_range(&Uniforms_vs_data{
+			model_matrix = drt.m,
+			veiw_matrix = v,
+			projection_matrix = p,
+			scz = utils.screen_size,
+			reverse_screen_y = rg.reverse_screen_y,
+		}))
 
-		//apply uniforms
-		sg.apply_uniforms(user.UB_Uniforms_Data, utils.sg_range(&Uniforms_vs_data{
+		lights_transform_data, lights_color_data := generate_lighting_uniforms_data()
+
+		//apply uniforms for fragment shader
+		sg.apply_uniforms(user.UB_Uniforms_fs_Data, utils.sg_range(&Uniforms_fs_data{
 			model_matrix = drt.m,
 			veiw_matrix = v,
 			projection_matrix = p,

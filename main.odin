@@ -127,8 +127,6 @@ main :: proc(){
 		cleanup_cb = cleanup_cb,
 		event_cb = event_cb,
 	})
-
-	
 }
 
 // =================

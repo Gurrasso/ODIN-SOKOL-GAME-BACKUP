@@ -1,5 +1,5 @@
 //
-// TODO: seg fault when adding more in and out in vs and fs. Maybe try placing array at top of in/out
+// TODO:
 //
 @header package user
 @header import sg "../../sokol/gfx"
@@ -17,14 +17,12 @@ in vec4 col;
 in vec2 uv;
 in vec4 bytes0;
 
-layout(binding=0) uniform Uniforms_Data {
+layout(binding=1) uniform Uniforms_vs_Data {
 	mat4 model_matrix;
 	mat4 view_matrix;
 	mat4 projection_matrix;
 	vec2 scz;
 	int reverse_screen_y;
-	vec4[16] lights_transform_data;
-	vec4[16] lights_color_data;
 	
 };
 
@@ -33,8 +31,6 @@ layout(binding=0) uniform Uniforms_Data {
 out vec4 color;
 out vec2 texcoord;
 out vec4 bytes;
-
-out vec4[16] lights;
 
 vec2 world_to_screen_pos(vec2 pos){
 	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
@@ -48,17 +44,6 @@ void main() {
 	color = col;
 	texcoord = uv;
 	bytes = bytes0;
-
-	vec4[16] lights_pos0;
-
-	for (int i = 0; i < 16; i ++){
-		lights_pos0[i].xy = world_to_screen_pos(lights_transform_data[i].xy);
-		lights_pos0[i].w = lights_transform_data[i].w;
-		lights_pos0[i].z = lights_transform_data[i].z;
-	}
-
-	lights = lights_pos0;
-
 
 	gl_Position = mvp*vec4(pos, 1);
 }
@@ -76,27 +61,45 @@ in vec4 color;
 in vec2 texcoord;
 in vec4 bytes;
 
-in vec4[16] lights;
-
 layout(binding=0) uniform texture2D tex;
 // sampler specifies things
 layout(binding=0) uniform sampler smp;
+
+layout(binding=0) uniform Uniforms_fs_Data {
+	mat4 model_matrix;
+	mat4 view_matrix;
+	mat4 projection_matrix;
+	vec2 scz;
+	int reverse_screen_y;
+	vec4[16] lights_transform_data;
+	vec4[16] lights_color_data;
+	
+};
+
+
 
 out vec4 frag_color; 
 
 vec4 tex_col = vec4(1.0);
 
+vec2 world_to_screen_pos(vec2 pos){
+	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
+	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);
+	return (ndcpos.xy*0.5+0.5)*scz;
+}
+
 void update_lighting(){
-	for(int i = 0; i < lights[0].w; i++){
-		float dist = length(gl_FragCoord.xy-lights[i].xy);
-		vec3 lightColor = vec3(1,1,1);
-		float lightRadius = lights[i].z; // in screen pixels
+	for(int i = 0; i < lights_transform_data[0].w; i++){
+		float dist = length(gl_FragCoord.xy-lights_transform_data[i].xy);
+		vec3 lightColor = lights_color_data[i].xyz;
+		float lightRadius = lights_transform_data[i].z; // in screen pixels
 
 		float attenuation = clamp(1.0 - dist / lightRadius, 0.0, 1.0);
   	attenuation = pow(attenuation, 2.0);
 
 		tex_col += vec4((lightColor) * attenuation, 0);
 	}
+
 }
 
 void main() {
