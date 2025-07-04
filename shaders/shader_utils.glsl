@@ -1,3 +1,8 @@
+
+vec3 mix_vec3(vec3 x, vec3 y, vec3 a){
+	return x * (1 - a) + y * a;
+}
+
 vec2 world_to_screen_pos(vec2 pos){
 	vec4 clippos = (projection_matrix*view_matrix) * vec4(pos.x, pos.y, 0, 1);
 	vec2 ndcpos = vec2(clippos.x/clippos.w, (-clippos.y*reverse_screen_y)/ clippos.w);

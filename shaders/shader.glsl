@@ -75,6 +75,8 @@ layout(binding=0) uniform Uniforms_fs_Data {
 
 vec4 tex_col = vec4(1.0);
 vec3 lit_col;
+vec3 lights_col = vec3(1.0);
+vec3 total_illumination;
 
 @include shader_utils.glsl
 
