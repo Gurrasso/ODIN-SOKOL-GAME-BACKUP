@@ -12,8 +12,6 @@ package main
 
 	maybe try and implement everything as an entity,
 
-	Seperate everything into multiple files(find a good way to organize the project)
-
 	Item lags behind player especially at lower fps,
 
 	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
@@ -31,15 +29,12 @@ package main
 	fix small characters like .,: having the wrong spacing,
 	maybe add .CORNER, .CENTER etc, for text alignment,
 
-	fix updating of vertex_buffers,
-	
 	make it so item holders can hold nothing,
 	weapons dont work for multiple enteties at a time,
 	
 	make sure we use the same naming for pos, rot etc everywhere,
 
-	sprite sheet rendering,
-	animation system with a sprite_animation object with different functions to toggle animations,
+	maybe dont use cooldowns for the animations instead doing some sort of mod of the runtime might be better?,
 	collisions,
 	
 	tilemap and other environment/map things,
@@ -49,7 +44,6 @@ package main
 	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
 	fix init_icon,
-
 
 	particle system implemented as a structure of arrays:
 	Particles :: struct {

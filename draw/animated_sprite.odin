@@ -97,7 +97,7 @@ init_animated_sprite_from_filename :: proc(
 update_animated_sprites :: proc(){
 	for id in g.animated_sprite_objects{
 		obj := g.animated_sprite_objects[id]
-		if !obj.animation_enabled do return
+		if !obj.animation_enabled do continue
 		
 		if !cooldown.cooldown_enabled(obj.cooldown){
 			cooldown.start_cooldown(obj.cooldown)
