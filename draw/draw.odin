@@ -70,15 +70,11 @@ init_sprite_from_img :: proc(
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
 
 	id := id
-	if id == ""{
-		id = utils.generate_string_id()
-	}
+	if id == Null_sprite_id do id = utils.generate_string_id()
 
 	buffer := get_vertex_buffer(transform.size, color_offset, DEFAULT_UV, tex_index)
 
-	if id in g.sprite_objects == false{
-		g.sprite_objects[id] = Sprite_object_group{}
-	}
+	if !(id in g.sprite_objects) do g.sprite_objects[id] = Sprite_object_group{}
 
 	object_group := &g.sprite_objects[id]
 

@@ -45,6 +45,8 @@ Globals :: struct {
 	
 	fonts: map[string]FONT_INFO,
 
+	animated_sprite_objects: map[string]Animated_sprite_object,
+
 	world_brightness: f32,
 }
 
@@ -150,6 +152,8 @@ init_draw_state :: proc(){
 
 draw_draw_state :: proc(){
 	
+	update_animated_sprites()
+
 	//
 	// rendering	
 	//
@@ -211,6 +215,28 @@ draw_draw_state :: proc(){
 			})
 		}	
 	}
+
+	//animated sprites
+	for id in g.animated_sprite_objects{
+		obj := g.animated_sprite_objects[id]	
+
+
+		//model matrix turns vertex positions into world space positions
+		m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
+	
+		b := sg.Bindings {
+			vertex_buffers = { 0 = obj.vertex_buffer },
+			index_buffer = rg.index_buffer,
+			images = { user.IMG_tex = obj.sprite_sheet },
+			samplers = { user.SMP_smp = rg.sampler },
+		}
+
+		append(&draw_data, Draw_data{
+			m = m,
+			b = b,
+			draw_priority = obj.draw_priority,
+		})
+	}	
 
 	//sort the array based on draw_priority so we can chose which things we want to be drawn over other, higher draw priority means that it gets drawn after(on top)
 	sort.merge_sort_proc(draw_data[:], compare_draw_data_draw_priority)

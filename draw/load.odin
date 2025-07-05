@@ -177,3 +177,29 @@ update_vertex_buffer_size :: proc(buffer: sg.Buffer, size: Vec2){
 	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_size")
 }
 
+
+update_vertex_buffer_uv :: proc(buffer: sg.Buffer, uvs: Vec4){
+	exists: bool
+
+	for &buffer_data in g.vertex_buffers{
+		if buffer_data.buffer == buffer{
+			color_offset := buffer_data.color_data
+			size := buffer_data.size_data
+			tex_index := buffer_data.tex_index_data
+			buffer_data.uv_data = uvs
+
+			vertices := []Vertex_data {
+				{ pos = { -(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.y}, tex_index = tex_index },
+				{ pos = {	(size.x/2), -(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.y}, tex_index = tex_index},
+				{ pos = { -(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.x, uvs.w}, tex_index = tex_index},
+				{ pos = {	(size.x/2),	(size.y/2), 0 }, col = color_offset, uv = {uvs.z, uvs.w}, tex_index = tex_index},
+			}
+
+			sg.update_buffer(buffer, utils.sg_range(vertices))
+
+			exists = true
+		}
+	}
+
+	if !exists do log.debug("ERROR: FAILED TO UPDATE BUFFER IN update_vertex_buffer_uv")
+}

@@ -49,8 +49,8 @@ init_game_state :: proc(){
 
 	draw.set_world_brightness(0.4)
 
-	draw.init_light(pos = {1, 3}, size = 6, intensity = 2, color = {0.2, 1, 1, 1})
-	draw.init_light(pos = {2, -2}, size = 3.5, intensity = 1.5, color = {1, 0.6, 0, 1})
+	draw.init_light(pos = {1, 3}, size = 6, intensity = 2, color = {1, 1, 1, 1})
+	draw.init_light(pos = {2, -2}, size = 3.5, intensity = 1.5, color = {1, 1, 1, 1})
 
 	draw.init_font(font_path = "./src/assets/fonts/MedodicaRegular.otf", id = "font1", font_h = 32)
 	
@@ -63,6 +63,10 @@ init_game_state :: proc(){
 		color = cu.sg_color(color3 = Vec3{138,43,226}), 
 		font_id = "font1"
 	)
+
+	ww := draw.init_animated_sprite(sprite_sheet_filename = "./src/assets/sprite_sheets/logoLandScape-Sheet.png", sprite_count = 50, transform = Transform{pos = {0, 3}, size = {8, 4}}, animation_speed = 0.08)
+	draw.start_animation(ww)
+
 
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
