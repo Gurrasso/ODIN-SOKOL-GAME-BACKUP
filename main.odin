@@ -4,7 +4,9 @@ package main
 /*
 	TODO: 
 
-	make lighting have a little effect durin "day",
+	make sure we arent leaking a bunch of memory,
+
+	make lighting have a little effect when its bright,
 
 	use uuid:s,
 
