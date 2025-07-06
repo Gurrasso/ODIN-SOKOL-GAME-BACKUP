@@ -5,6 +5,7 @@ package main
 	TODO: 
 
 	make sure we arent leaking a bunch of memory,
+	delete vertex buffers and images that arent in use? Maybe rework the vertex buffer system a little?,
 
 	make lighting have a little effect when its bright,
 
@@ -35,6 +36,7 @@ package main
 	make sure we use the same naming for pos, rot etc everywhere,
 
 	maybe dont use cooldowns for the animations instead doing some sort of mod of the runtime might be better?,
+	
 	collisions,
 	
 	tilemap and other environment/map things,

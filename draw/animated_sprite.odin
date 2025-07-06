@@ -25,7 +25,13 @@ Animated_sprite_object :: struct{
 	animation_enabled: bool,
 }
 
-update_animated_sprite_img :: proc(
+delete_animated_sprite :: proc(id: Sprite_id){
+	assert(id in g.animated_sprite_objects)
+
+	delete_key(&g.animated_sprite_objects, id)
+}
+
+update_animated_sprite_sheet :: proc(
 	id: Sprite_id,
 	sprite_sheet: sg.Image,
 	sprite_count: uint,
@@ -34,6 +40,8 @@ update_animated_sprite_img :: proc(
 	obj := &g.animated_sprite_objects[id]
 	obj.sprite_sheet = sprite_sheet
 	obj.sprite_count = sprite_count
+
+	update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
 }
 
 init_animated_sprite :: proc{

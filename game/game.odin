@@ -64,10 +64,8 @@ init_game_state :: proc(){
 		font_id = "font1"
 	)
 
-
 	ww := draw.init_animated_sprite(sprite_sheet_filename = "./src/assets/sprite_sheets/logoLandScape-Sheet.png", sprite_count = 50, transform = Transform{pos = {0, 3}, size = {8, 4}}, animation_speed = 0.08)
 	draw.start_animation(ww)
-
 
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
