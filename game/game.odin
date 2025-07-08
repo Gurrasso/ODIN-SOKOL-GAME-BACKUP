@@ -267,14 +267,19 @@ update_player :: proc() {
 		player.current_move_speed = player.move_speed * player_deceleration_ease(player.duration)
 	}	
 
+	//update sprites
 	if utils.get_vector_magnitude(player.move_dir) > 0 && utils.get_vector_magnitude(player.last_move_dir) <= 0 {
 		draw.update_animated_sprite_sheet(player.sprite_id, player.running_sprite_filename, 12)
-		draw.update_animated_sprite_speed(player.sprite_id, 0.1)
 	}
 	else if utils.get_vector_magnitude(player.move_dir) <= 0 && utils.get_vector_magnitude(player.last_move_dir) > 0 {
 		draw.update_animated_sprite_sheet(player.sprite_id, player.idle_sprite_filename, 8)
-		draw.update_animated_sprite_speed(player.sprite_id, 0.14)
 	}
+
+	//update sprites animation speed
+	if utils.get_vector_magnitude(player.move_dir) <= 0 do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.14)
+	else if gs.player.sprint.enabled do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
+	else do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
+
 
 	
 	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
@@ -423,11 +428,9 @@ init_player_sprint :: proc(){
 update_sprint :: proc(){
 	if gs.player.sprint.enabled {
 		gs.player.move_speed = gs.player.sprint.speed
-		draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
 	}
 	else { 
 		gs.player.move_speed = gs.player.default_move_speed
-		draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
 	}
 }
 

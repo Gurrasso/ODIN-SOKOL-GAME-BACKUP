@@ -33,6 +33,7 @@ package main
 	
 	make sure we use the same naming for pos, rot etc everywhere,
 
+	some sort of animation system for enteties,
 	maybe dont use cooldowns for the animations instead doing some sort of mod of the runtime might be better?,
 	
 	collisions,
