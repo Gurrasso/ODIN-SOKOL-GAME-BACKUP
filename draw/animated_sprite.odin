@@ -31,7 +31,39 @@ delete_animated_sprite :: proc(id: Sprite_id){
 	delete_key(&g.animated_sprite_objects, id)
 }
 
-update_animated_sprite_sheet :: proc(
+update_animated_sprite :: proc{
+	update_animated_sprite_transform,
+}
+
+update_animated_sprite_transform :: proc(transform: Transform, id: Sprite_id){
+	assert(id in g.animated_sprite_objects)
+
+	obj := &g.animated_sprite_objects[id]
+	obj.pos = utils.vec2_to_vec3(transform.pos)
+	obj.rot = transform.rot
+}
+
+update_animated_sprite_speed :: proc(id: Sprite_id, animation_speed: f32){
+	assert(id in g.animated_sprite_objects)
+
+	obj := &g.animated_sprite_objects[id]
+	cooldown.update_cooldown_cooldown(obj.cooldown, animation_speed)
+}
+
+update_animated_sprite_sheet :: proc{
+	update_animated_sprite_sheet_from_img,
+	update_animated_sprite_sheet_from_filename,
+}
+
+update_animated_sprite_sheet_from_filename :: proc(
+	id: Sprite_id,
+	sprite_sheet_filename: cstring,
+	sprite_count: uint,
+){
+	update_animated_sprite_sheet_from_img(id, get_image(sprite_sheet_filename), sprite_count)
+}
+
+update_animated_sprite_sheet_from_img :: proc(
 	id: Sprite_id,
 	sprite_sheet: sg.Image,
 	sprite_count: uint,
@@ -151,6 +183,6 @@ stop_animation :: proc(id: Sprite_id){
 	assert(id in g.animated_sprite_objects)
 
 	obj := &g.animated_sprite_objects[id]
-	
+	update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
 	obj.animation_enabled = false
 }

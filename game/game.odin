@@ -64,9 +64,6 @@ init_game_state :: proc(){
 		font_id = "font1"
 	)
 
-	ww := draw.init_animated_sprite(sprite_sheet_filename = "./src/assets/sprite_sheets/logoLandScape-Sheet.png", sprite_count = 50, transform = Transform{pos = {0, 3}, size = {8, 4}}, animation_speed = 0.08)
-	draw.start_animation(ww)
-
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
@@ -140,11 +137,15 @@ event_listener :: proc(){
 // PLAYER
 Player :: struct{
 	sprite_id: Sprite_id,
-	sprite_filename: cstring,
+	idle_sprite_filename: cstring,
+	running_sprite_filename: cstring,
 	transform: Transform,	
 	xflip: f32,
 	xflip_threshold: f32,
 	
+	//used for animations
+	last_move_dir: Vec2,
+
 	move_dir: Vec2,
 	look_dir: Vec2,
 	
@@ -167,10 +168,11 @@ init_player :: proc(){
 	// setup the player
 
 	gs.player = Player{
-		sprite_filename = "./src/assets/textures/Random.png",
+		idle_sprite_filename = "./src/assets/sprite_sheets/idle_template_character.png",
+		running_sprite_filename = "./src/assets/sprite_sheets/running_template_character.png",
 		
 		transform = {
-			size = { 1,1 }
+			size = { 0.7,1.4 }
 		},
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
@@ -184,18 +186,19 @@ init_player :: proc(){
 		deceleration = 18,
 
 		holder = {
-			item = es.enteties["gun"],
+			item = es.enteties["empty"],
 			equipped = true,
 		},
 		
 		//how far away from the player an item is
-		item_offset = Vec2{0.3, -0.05},
+		item_offset = Vec2{0.2, -0.34},
 	}
 	gs.player.move_speed = gs.player.default_move_speed
 	init_player_abilities()
 
 	//init the players sprite
-	gs.player.sprite_id = draw.init_sprite(gs.player.sprite_filename, gs.player.transform)
+	gs.player.sprite_id = draw.init_animated_sprite(sprite_sheet_filename = gs.player.idle_sprite_filename, transform = gs.player.transform, sprite_count = 8, animation_speed = 0.14)
+	draw.start_animation(gs.player.sprite_id)
 	//init the players item_holder
 	init_item_holder(&gs.player.holder)
 }
@@ -242,7 +245,7 @@ update_player :: proc() {
 	//gs.player.look_dir = gs.player.move_dir
 
 	update_player_abilities()
-	
+
 	//player movement with easing curves
 	if move_input != 0 {
 		player.move_dir = up * move_input.y + right * move_input.x
@@ -254,6 +257,7 @@ update_player :: proc() {
 		//the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
 		player.current_move_speed = player.move_speed * player_acceleration_ease(gs.player.duration)
 	} else {
+		player.move_dir = {0,0}
 		
 		//the duration decreses with the deceleration when not giving any input
 		player.duration -= player.deceleration * utils.dt
@@ -263,12 +267,21 @@ update_player :: proc() {
 		player.current_move_speed = player.move_speed * player_deceleration_ease(player.duration)
 	}	
 
+	if utils.get_vector_magnitude(player.move_dir) > 0 && utils.get_vector_magnitude(player.last_move_dir) <= 0 {
+		draw.update_animated_sprite_sheet(player.sprite_id, player.running_sprite_filename, 12)
+		draw.update_animated_sprite_speed(player.sprite_id, 0.1)
+	}
+	else if utils.get_vector_magnitude(player.move_dir) <= 0 && utils.get_vector_magnitude(player.last_move_dir) > 0 {
+		draw.update_animated_sprite_sheet(player.sprite_id, player.idle_sprite_filename, 8)
+		draw.update_animated_sprite_speed(player.sprite_id, 0.14)
+	}
+
 	
 	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
+	transform.pos += motion
 
 	//update the item holder of the player
 	holder := &player.holder
-
 
 	//pos
 	holder_item_data := es.entity_get_component(entity = holder.item.entity, component_type = Item_data) 
@@ -300,8 +313,9 @@ update_player :: proc() {
 	//creates a player rotation based of the movement
 	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
 
-	transform.pos += motion
-	draw.update_sprite(transform = transform^, id = player.sprite_id)
+	draw.update_animated_sprite(transform = transform^, id = player.sprite_id)
+
+	player.last_move_dir = player.move_dir
 }
 
 
@@ -407,8 +421,14 @@ init_player_sprint :: proc(){
 }
 
 update_sprint :: proc(){
-	if gs.player.sprint.enabled do gs.player.move_speed = gs.player.sprint.speed
-	else do gs.player.move_speed = gs.player.default_move_speed
+	if gs.player.sprint.enabled {
+		gs.player.move_speed = gs.player.sprint.speed
+		draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
+	}
+	else { 
+		gs.player.move_speed = gs.player.default_move_speed
+		draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
+	}
 }
 
 //ITEM INITS

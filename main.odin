@@ -13,8 +13,6 @@ package main
 
 	maybe try and implement everything as an entity,
 
-	Item lags behind player especially at lower fps,
-
 	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
 
 	u32 sprite ids?

@@ -55,5 +55,9 @@ init_cooldown_object :: proc(cooldown: f32) -> Cooldown{
 	return Cooldown(id)
 }
 
+update_cooldown_cooldown :: proc(id: Cooldown, cooldown: f32){
+	assert(id in cooldowns)
 
-
+	obj := &cooldowns[id]
+	obj.cooldown = cooldown
+}
