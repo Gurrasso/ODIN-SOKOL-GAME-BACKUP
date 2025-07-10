@@ -92,7 +92,7 @@ void main() {
 
 	int tex_index = int(bytes.x * 255.0);
 
-	if (tex_index == 0) {				// ALL NORMAL TEXTURES
+	if (tex_index != 1) {				// ALL NORMAL TEXTURES
 		tex_col = texture(sampler2D(tex, smp), new_texcoord);
 
 
@@ -104,8 +104,13 @@ void main() {
 	tex_col *= color;
 	
 	update_lighting();
-
-	frag_color = vec4(lit_col, tex_col.a);
+	
+	if (tex_index == 2){
+		//this means no lighting should affect it
+		frag_color = tex_col;
+	}else {
+		frag_color = vec4(lit_col, tex_col.a);
+	}
 }
 
 @end

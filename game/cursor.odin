@@ -37,7 +37,8 @@ init_cursor :: proc(){
 	gs.cursor.sprite_id = draw.init_sprite(
 		filename = gs.cursor.filename, 
 		transform = gs.cursor.transform,
-		draw_priority = .cursor
+		draw_priority = .cursor,
+		tex_index = .no_lighting,
 	)
 }
 

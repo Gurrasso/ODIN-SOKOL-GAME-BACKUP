@@ -46,7 +46,7 @@ WHITE_IMAGE : sg.Image
 init_rect :: proc(
 	color: sg.Color = { 1,1,1,1 }, 
 	transform: Transform = DEFAULT_TRANSFORM, 
-	id: Sprite_id = Null_sprite_id, tex_index: u8 = tex_indices.default, 
+	id: Sprite_id = Null_sprite_id, tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default
 ) -> string{
 	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
@@ -61,8 +61,8 @@ init_sprite :: proc{
 init_sprite_from_img :: proc(
 	img: sg.Image, 
 	transform: Transform = DEFAULT_TRANSFORM, 
-	id: Sprite_id = Null_sprite_id, tex_index: 
-	u8 = tex_indices.default, 
+	id: Sprite_id = Null_sprite_id, 
+	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default, 
 	color_offset: sg.Color = { 1,1,1,1 }
 ) -> string{
@@ -96,7 +96,7 @@ init_sprite_from_filename :: proc(
 	filename: cstring, 
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, 
-	tex_index: u8 = tex_indices.default, 
+	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default
 ) -> string{
 	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
@@ -189,15 +189,12 @@ Draw_layers :: enum i32{
 
 // TEX_INDICES
 
-Tex_indices :: struct{
-	default: u8,
-	text: u8,
-}
-
-tex_indices := Tex_indices{
+Tex_indices :: enum u8{
 	default = 0,
 	text = 1,
+	no_lighting = 2, 
 }
+
 
 // ==========
 //   :FONT			 (	 only a little scuffed	 )
@@ -431,7 +428,7 @@ generate_char_object :: proc(
 	text_uv: Vec4, 
 	color_offset: sg.Color , 
 	img: sg.Image, 
-	tex_index: u8 = tex_indices.text
+	tex_index: Tex_indices = .text
 ) -> Char_object{
 
 	// vertices

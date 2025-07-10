@@ -85,7 +85,7 @@ init_animated_sprite_from_img :: proc(
 	sprite_sheet: sg.Image, 
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, 
-	tex_index: u8 = tex_indices.default, 
+	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default, 
 	color_offset: sg.Color = { 1,1,1,1 },
 	//how many seconds it takes for the animation to switch image
@@ -125,7 +125,7 @@ init_animated_sprite_from_filename :: proc(
 	sprite_sheet_filename: cstring, 
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, 
-	tex_index: u8 = tex_indices.default, 
+	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default, 
 	color_offset: sg.Color = { 1,1,1,1 },
 	animation_speed: f32 = 0.1,

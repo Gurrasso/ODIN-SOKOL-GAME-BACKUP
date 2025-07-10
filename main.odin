@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	mayber enums should have all caps,
+
 	make sure we arent leaking a bunch of memory,
 	delete vertex buffers and images that arent in use? Maybe rework the vertex buffer system a little?,
 

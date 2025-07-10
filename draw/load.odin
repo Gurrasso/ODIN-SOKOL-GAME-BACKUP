@@ -114,10 +114,12 @@ get_image_desc :: proc(filename: cstring) -> sapp.Image_Desc{
 get_vertex_buffer :: proc(
 	size: Vec2, 
 	color_offset: sg.Color, 
-	uvs: Vec4, tex_index: u8
+	uvs: Vec4, tex_index: Tex_indices
 ) -> sg.Buffer{
 	
 	buffer: sg.Buffer
+
+	tex_index: u8 = auto_cast tex_index
 	
 	buffer_exists: bool = false
 	for vertex_buffer in g.vertex_buffers{
