@@ -4,9 +4,11 @@ package main
 /*
 	TODO: 
 
+	package thing ( foo:package ),
+
 	maybe enums should have all caps,
 
-	make sure we arent leaking a bunch of memory,
+	make sure we arent leaking a bunch of memory, implement some test?,
 	delete vertex buffers and images that arent in use? Maybe rework the vertex buffer system a little?,
 
 	make lighting have a little effect when its bright,
