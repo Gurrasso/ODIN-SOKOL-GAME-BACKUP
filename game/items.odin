@@ -72,7 +72,7 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 
 	if should_shoot{
 		cooldown.start_cooldown(weapon.cooldown_object)
-		for i := 0; i < weapon.shots; i += 1{
+		for i in 0..< weapon.shots{
 						
 			sprite_id := utils.generate_string_id()
 		

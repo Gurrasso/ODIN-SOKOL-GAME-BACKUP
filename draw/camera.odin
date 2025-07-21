@@ -137,7 +137,7 @@ camera_follow :: proc(position: Vec2, lookahead: f32 = 0, lookahead_dir: Vec2 = 
 	move_mag := utils.get_vector_magnitude(pos_difference) * utils.dt
 
 	//change the spring force with a gradient between different values
-	for i := 0; i<len(camera.asym_forces); i+=1 {
+	for i in 0..<len(camera.asym_forces) {
 		//the current threshold and force values
 		sf := camera.asym_forces[i]
 		

@@ -85,12 +85,8 @@ init_draw_state :: proc(){
 	init_camera()
 
 	//different rendering backends have top left or bottom left as the screen origin
-	rg.inverse_screen_y = false
-	rg.reverse_screen_y = 1
-	if !sg.query_features().origin_top_left{
-		rg.inverse_screen_y = true
-		rg.reverse_screen_y = -1;
-	}
+	rg.inverse_screen_y = sg.query_features().origin_top_left ?  false : true
+	rg.reverse_screen_y = sg.query_features().origin_top_left ?  1 : -1 
 
 	//white image for scuffed rect rendering
 	WHITE_IMAGE = get_image(WHITE_IMAGE_PATH)

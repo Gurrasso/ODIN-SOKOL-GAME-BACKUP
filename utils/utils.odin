@@ -173,7 +173,7 @@ generate_map_u32_id :: proc(target_map: $T) -> u32{
 get_index :: proc(array: $T, target: $T1) -> int{
 	index: int = 0
 
-	for i := 0; i < len(array); i+=1{
+	for i in 0..<len(array){
 		if array[i] == target{
 				index = i
 		}
