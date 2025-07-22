@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	use fmod?
+
 	package thing ( foo:package ),
 
 	maybe enums should have all caps,
@@ -50,7 +52,7 @@ package main
 	resolution scaling? or try and change the dpi/res with sokol?,
 	fix init_icon,
 
-	particle system implemented as a structure of arrays:
+	particle system implemented as a structure of arrays?:
 	Particles :: struct {
 		positions [dynamic]Vec2,
 		array,
@@ -61,6 +63,8 @@ package main
 		other data,
 	}
 	Particles: [dynamic]Particle
+
+	Randys particle system for refrence https://gist.github.com/randyprime/0878ebcbe728139e5d91d903a5e2bd0b (not struct of arrays),
 
 
 	make it so cursor doesnt camerashake?
