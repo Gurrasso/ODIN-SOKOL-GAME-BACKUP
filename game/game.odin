@@ -14,6 +14,7 @@ import sg "../../sokol/gfx"
 
 import "../utils"
 import "../draw"
+import cooldown "../utils/cooldown"
 import cu "../utils/color"
 import es "../enteties"
 import events "../events"

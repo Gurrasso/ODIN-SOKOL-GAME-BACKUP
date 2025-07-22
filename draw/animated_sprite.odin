@@ -21,7 +21,8 @@ Animated_sprite_object :: struct{
 	draw_priority: i32,
 	vertex_buffer: sg.Buffer,
 	sprite_count: uint,
-	cooldown: cooldown.Cooldown,
+	res_id: cooldown.Res_object,
+	animation_speed: f32,
 	animation_enabled: bool,
 }
 
@@ -47,7 +48,7 @@ update_animated_sprite_speed :: proc(id: Sprite_id, animation_speed: f32){
 	assert(id in g.animated_sprite_objects)
 
 	obj := &g.animated_sprite_objects[id]
-	cooldown.update_cooldown_cooldown(obj.cooldown, animation_speed)
+	obj.animation_speed = animation_speed
 }
 
 update_animated_sprite_sheet :: proc{
@@ -112,11 +113,10 @@ init_animated_sprite_from_img :: proc(
 		auto_cast draw_priority,
 		buffer,
 		sprite_count,
-		cooldown.init_cooldown_object(animation_speed),
+		utils.generate_string_id(),
+		animation_speed,
 		false,
 	}
-
-	cooldown.start_cooldown(g.animated_sprite_objects[id].cooldown)
 
 	return id
 }
@@ -139,8 +139,7 @@ update_animated_sprites :: proc(){
 		obj := g.animated_sprite_objects[id]
 		if !obj.animation_enabled do continue
 		
-		if !cooldown.cooldown_enabled(obj.cooldown){
-			cooldown.start_cooldown(obj.cooldown)
+		if cooldown.run_every_seconds(obj.animation_speed, obj.res_id){
 			buffer := obj.vertex_buffer
 			exists: bool
 			for &buffer_data in g.vertex_buffers{

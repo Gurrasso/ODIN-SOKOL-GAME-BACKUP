@@ -55,9 +55,52 @@ init_cooldown_object :: proc(cooldown: f32) -> Cooldown{
 	return Cooldown(id)
 }
 
+delete_cooldown_object :: proc(id: Cooldown){
+	assert(id in cooldowns)
+
+	delete_key(&cooldowns, id)
+}
+
 update_cooldown_cooldown :: proc(id: Cooldown, cooldown: f32){
 	assert(id in cooldowns)
 
 	obj := &cooldowns[id]
 	obj.cooldown = cooldown
+}
+
+get_cooldown_cooldown :: proc(id: Cooldown) -> f32{
+	assert(id in cooldowns)
+
+	obj := &cooldowns[id]
+	return obj.cooldown
+}
+
+// Run every seconds
+
+Res_object :: string
+
+res_objects: map[Res_object]Cooldown
+
+// goes to true every "seconds"
+run_every_seconds :: proc(time: f32, id: Res_object) -> bool{
+	if !(id in res_objects){
+		res_objects[id] = init_cooldown_object(time)
+		start_cooldown(res_objects[id])
+		return false
+	}else {
+		res := res_objects[id]
+		if time != get_cooldown_cooldown(res) do update_cooldown_cooldown(res, time)
+
+		if cooldown_enabled(res) do return false
+		else{
+			start_cooldown(res)
+			return true
+		}
+	}
+}
+
+delete_res_object :: proc(id: Res_object){
+	assert(id in res_objects)
+
+	delete_key(&res_objects, id)
 }

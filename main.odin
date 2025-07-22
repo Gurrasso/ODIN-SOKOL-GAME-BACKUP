@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	delete res_objects that arent in use?,
+
 	use fmod?
 
 	package thing ( foo:package ),
