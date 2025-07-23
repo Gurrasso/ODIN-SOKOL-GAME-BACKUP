@@ -9,7 +9,6 @@ import sg "../../sokol/gfx"
 import "../utils"
 import "../draw"
 import cu "../utils/color"
-import es "../enteties"
 import "../events"
 import "../utils/cooldown"
 
@@ -154,7 +153,7 @@ remove_projectile :: proc(projectile: ^Projectile){
 //item holder is an obj that can display and update an entity with the item tag
 Item_holder :: struct{
 	transform: Transform,	
-	item: es.Entity,
+	item: Entity,
 	sprite_id: Sprite_id,
 	//if items like guns should be equipped
 	equipped: bool,
@@ -164,17 +163,17 @@ Item_holder :: struct{
 init_item_holder :: proc(holder: ^Item_holder){
 
 	item := holder.item
-	assert(utils.contains(item.tags, es.Entity_tags.Item))
+	assert(utils.contains(item.tags, Entity_tags.Item))
 
-	#partial switch tag2 := item.tags[utils.get_next_index(item.tags, es.Entity_tags.Item)]; tag2{
+	#partial switch tag2 := item.tags[utils.get_next_index(item.tags, Entity_tags.Item)]; tag2{
 	case .Projectile_weapon:
 		if holder.equipped{
-			pweapon := es.entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
+			pweapon := entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
 			init_projectile_weapon(pweapon)
 		}
 	}
 
-	item_data := es.entity_get_component(entity = item.entity, component_type = Item_data)
+	item_data := entity_get_component(entity = item.entity, component_type = Item_data)
 	holder.sprite_id = init_item(&holder.transform, item_data^)
 }
 
@@ -187,24 +186,24 @@ update_item_holder :: proc(
 ){
 	//the players item
 	item := holder.item
-	#partial switch tag2 := item.tags[utils.get_next_index(item.tags, es.Entity_tags.Item)]; tag2{
+	#partial switch tag2 := item.tags[utils.get_next_index(item.tags, Entity_tags.Item)]; tag2{
 	case .Projectile_weapon:
 		if holder.equipped{
-			pweapon := es.entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
+			pweapon := entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
 			update_projectile_weapon(pweapon, look_dir, shoot_pos)
 		}		
 	}
 
-	item_data := es.entity_get_component(entity = item.entity, component_type = Item_data)
+	item_data := entity_get_component(entity = item.entity, component_type = Item_data)
 	update_item(holder.transform, item_data^, holder.sprite_id)
 }
 
 //gives an item to the item holder which potentially replaces the old one, the inits the holder
 give_item :: proc(holder: ^Item_holder, item_id: string){
-	assert(item_id in es.enteties)
+	assert(item_id in gs.enteties)
 	
 	draw.remove_object(holder.sprite_id)
-	holder.item = es.enteties[item_id]
+	holder.item = gs.enteties[item_id]
 	init_item_holder(holder)
 }
 

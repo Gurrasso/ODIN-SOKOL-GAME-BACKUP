@@ -92,7 +92,6 @@ import "utils"
 import "draw"
 import "game"
 import "events"
-import "enteties"
 import "utils/cooldown"
 
 Spring :: struct{
@@ -119,7 +118,7 @@ main :: proc(){
 	context.logger = log.create_console_logger()
 	default_context = context
 	
-	enteties.enteties_init()
+	game.enteties_init()
 
 	//sokol app
 	sapp.run({

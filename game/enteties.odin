@@ -1,12 +1,10 @@
-package enteties
+package game
 
 import "base:intrinsics"
 import ecs "../lib/odin-ecs"
 import "core:log"
 
 ctx: ecs.Context
-
-enteties: Enteties
 
 // ================
 //    :ENTETIES
@@ -34,14 +32,14 @@ Entity_tags :: enum{
 }
 
 create_entity :: proc(id: string, tags: [dynamic]Entity_tags){
-	enteties[id] = Entity{
+	gs.enteties[id] = Entity{
 		entity = ecs.create_entity(&ctx),
 		tags = tags,
 	}
 }
 
 entity_add_component :: proc(id: string, component: $T){
-	temp, error := ecs.add_component(&ctx, enteties[id].entity, component)
+	temp, error := ecs.add_component(&ctx, gs.enteties[id].entity, component)
 	if error != .NO_ERROR do log.debug(error)
 }
 
@@ -58,7 +56,7 @@ entity_entity_get_component :: proc(entity: ecs.Entity, $component_type: typeid)
 }
 
 entity_id_get_component :: proc(id: string, $component_type: typeid) -> ^component_type{
-	return entity_entity_get_component(enteties[id].entity, component_type)
+	return entity_entity_get_component(gs.enteties[id].entity, component_type)
 }
 
 entity_log_component_ptr  :: proc(entity: ecs.Entity, $component_type: typeid){
@@ -78,7 +76,7 @@ destroy_entity_entity :: proc(entity: ecs.Entity){
 }
 
 destroy_entity_id :: proc(id: string){
-	ecs.destroy_entity(&ctx, enteties[id].entity)
+	ecs.destroy_entity(&ctx, gs.enteties[id].entity)
 }
 
 

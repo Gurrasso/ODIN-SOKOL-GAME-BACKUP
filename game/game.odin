@@ -16,8 +16,7 @@ import "../utils"
 import "../draw"
 import cooldown "../utils/cooldown"
 import cu "../utils/color"
-import es "../enteties"
-import events "../events"
+import ev "../events"
 
 // ==============
 //     :GAME
@@ -27,6 +26,7 @@ import events "../events"
 Game_state :: struct{
 	background_sprite: Sprite_id,
 	projectiles: [dynamic]Projectile,
+	enteties: Enteties,
 	player: Player,
 	cursor: Cursor,
 }
@@ -93,7 +93,7 @@ update_game_state :: proc(){
 
 	update_background();
 
-	events.mouse_move = {}
+	ev.mouse_move = {}
 	
 }
 
@@ -113,16 +113,16 @@ tempiteminc: int
 // all the event based checks (eg keyboard inputs)
 event_listener :: proc(){
 	//Exit program if you hit escape
-	if events.listen_key_down(.ESCAPE) {
+	if ev.listen_key_down(.ESCAPE) {
 		quit_game()
 	}
 
 	//fullscreen on F11
-	if events.listen_key_single_down(.F11) {
+	if ev.listen_key_single_down(.F11) {
 		sapp.toggle_fullscreen()
 	}
 
-	if events.listen_key_single_down(.F){
+	if ev.listen_key_single_down(.F){
 		if tempiteminc %% 2 == 0{
 			give_item(&gs.player.holder, "otto")
 			tempiteminc += 1
@@ -132,7 +132,7 @@ event_listener :: proc(){
 		}
 	}
 
-	if !sapp.mouse_locked() && events.listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
+	if !sapp.mouse_locked() && ev.listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
 }
 
 // PLAYER
@@ -187,7 +187,7 @@ init_player :: proc(){
 		deceleration = 18,
 
 		holder = {
-			item = es.enteties["empty"],
+			item = gs.enteties["empty"],
 			equipped = true,
 		},
 		
@@ -223,10 +223,10 @@ update_player :: proc() {
 
 	//changing the move_input with wasd
 	move_input: Vec2
-	if events.key_down[.W] do move_input.y = 1
-	else if events.key_down[.S] do move_input.y = -1
-	if events.key_down[.A] do move_input.x = -1
-	else if events.key_down[.D] do move_input.x = 1
+	if ev.key_down[.W] do move_input.y = 1
+	else if ev.key_down[.S] do move_input.y = -1
+	if ev.key_down[.A] do move_input.x = -1
+	else if ev.key_down[.D] do move_input.x = 1
 
 	//defining the definitions of up and right which in turn gives us the other directions
 	up := Vec2{0,1}
@@ -290,7 +290,7 @@ update_player :: proc() {
 	holder := &player.holder
 
 	//pos
-	holder_item_data := es.entity_get_component(entity = holder.item.entity, component_type = Item_data) 
+	holder_item_data := entity_get_component(entity = holder.item.entity, component_type = Item_data) 
 	holder_offset := (holder_item_data^.size.x/2) 
 	holder_rotation_pos := transform.pos + ( player.item_offset.x * player.xflip)
 	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, transform.pos.y}
@@ -334,12 +334,12 @@ init_player_abilities :: proc(){
 
 update_player_abilities :: proc(){
 	//check for sprint
-	if events.listen_key_down(gs.player.sprint.button) do gs.player.sprint.enabled = true
+	if ev.listen_key_down(gs.player.sprint.button) do gs.player.sprint.enabled = true
 	else do gs.player.sprint.enabled = false
 	update_sprint()
 
 	//check for dash
-	if events.listen_key_single_down(gs.player.dash.button){
+	if ev.listen_key_single_down(gs.player.dash.button){
 		gs.player.dash.enabled = true
 	}
 	if gs.player.dash.enabled{
@@ -444,8 +444,8 @@ init_items :: proc(){
 		img = draw.get_image("./src/assets/textures/transparent.png"),
 		size = {1, 1},
 	}
-	es.create_entity("empty", {.Item})
-	es.entity_add_component("empty", empty_item_data)
+	create_entity("empty", {.Item})
+	entity_add_component("empty", empty_item_data)
 
 }
 
@@ -474,9 +474,9 @@ init_weapons :: proc(){
 		size = {1, 0.2}
 	}
 	
-	es.create_entity("gun", {.Item, .Projectile_weapon})	
-	es.entity_add_component("gun", gun_item_data)
-	es.entity_add_component("gun", gun_weapon_data)
+	create_entity("gun", {.Item, .Projectile_weapon})	
+	entity_add_component("gun", gun_item_data)
+	entity_add_component("gun", gun_weapon_data)
 
 	arvid_weapon_data := Projectile_weapon{
 		trigger = .LEFT,
@@ -500,9 +500,9 @@ init_weapons :: proc(){
 		size = {0.7, 0.2}
 	}
 
-	es.create_entity("arvid", {.Item, .Projectile_weapon})	
-	es.entity_add_component("arvid", arvid_item_data)
-	es.entity_add_component("arvid", arvid_weapon_data)
+	create_entity("arvid", {.Item, .Projectile_weapon})	
+	entity_add_component("arvid", arvid_item_data)
+	entity_add_component("arvid", arvid_weapon_data)
 
 	otto_weapon_data := Projectile_weapon{
 		trigger = .LEFT,
@@ -526,9 +526,9 @@ init_weapons :: proc(){
 		img = draw.get_image(WHITE_IMAGE_PATH),
 		size = {2, 0.2}
 	}
-	es.create_entity("otto", {.Item, .Projectile_weapon})	
-	es.entity_add_component("otto", otto_item_data)
-	es.entity_add_component("otto", otto_weapon_data)
+	create_entity("otto", {.Item, .Projectile_weapon})	
+	entity_add_component("otto", otto_item_data)
+	entity_add_component("otto", otto_weapon_data)
 
 }
 
