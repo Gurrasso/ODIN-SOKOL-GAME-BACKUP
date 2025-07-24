@@ -235,7 +235,7 @@ init_text :: proc(
 	color: sg.Color = { 1,1,1,1 }, 
 	text: string, 
 	font_id: string, 
-	text_object_id: string = "text", 
+	text_object_id: string = "", 
 	text_rot : f32 = 0, 
 	draw_priority: Draw_layers = .text, 
 	draw_from_center: bool = false

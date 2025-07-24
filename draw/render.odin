@@ -282,6 +282,12 @@ draw_cleanup :: proc(){
 		sg.destroy_image(image.image)
 	}
 
+	for id, data in g.fonts {
+		sg.destroy_image(data.img)
+	}
+
+
+
 	sg.destroy_sampler(rg.sampler)
 	sg.destroy_buffer(rg.index_buffer)
 	sg.destroy_pipeline(rg.pipeline)

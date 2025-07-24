@@ -327,6 +327,3 @@ get_screen_size_in_world :: proc(target_z: f32) -> Vec2{
 
 	return linalg.abs(get_pixel_size_in_world(bottom_right, target_z))
 }
-
-
-

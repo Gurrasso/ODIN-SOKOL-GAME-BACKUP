@@ -11,7 +11,6 @@ import stbi "vendor:stb/image"
 
 import utils "../utils"
 
-
 // the vertex data
 Vertex_data :: struct{
 	pos: Vec3,
@@ -37,10 +36,24 @@ Images :: struct{
 //   :IMAGE THINGS
 // ==================
 
+load_image :: proc(filename:cstring) -> sg.Image{
+	image: sg.Image
+
+	image = load_image_stbi(filename)
+
+	append(&g.images, Images{
+		filename = filename,
+		image = image,
+	})
+
+	return image
+}
+
 //	proc for loading an image from a file
-load_image :: proc(filename: cstring) -> sg.Image{
+load_image_stbi :: proc(filename: cstring) -> sg.Image{
 	w, h: i32
 	pixels := stbi.load(filename, &w, &h, nil, 4)
+	
 	assert(pixels != nil)
 
 	image := sg.make_image({
@@ -59,12 +72,6 @@ load_image :: proc(filename: cstring) -> sg.Image{
 		}
 	})
 
-	append(&g.images, Images{
-		filename = filename,
-		image = image,
-	})
-
-
 	stbi.image_free(pixels)
 	
 	return image
@@ -72,20 +79,13 @@ load_image :: proc(filename: cstring) -> sg.Image{
 
 get_image :: proc(filename: cstring) -> sg.Image{
 	
-	new_image: sg.Image
-	image_exists: bool = false
 	for image in g.images{
 		if image.filename == filename{
-			image_exists = true
-			new_image = image.image
-		} 
+			return image.image
+		}
 	}
 
-	if !image_exists{
-		new_image = load_image(filename)
-	}
-
-	return new_image
+	return load_image(filename)
 }
 
 get_image_desc :: proc(filename: cstring) -> sapp.Image_Desc{

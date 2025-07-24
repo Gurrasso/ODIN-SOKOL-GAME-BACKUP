@@ -4,31 +4,31 @@ package main
 /*
 	TODO: 
 
-	delete res_objects that arent in use?,
-
 	use fmod?
-
-	package thing ( foo:package ),
 
 	maybe enums should have all caps,
 
 	make sure we arent leaking a bunch of memory, implement some test?,
 	delete vertex buffers and images that arent in use? Maybe rework the vertex buffer system a little?,
+	
+	delete res_objects that arent in use?,
 
 	make lighting have a little effect when its bright,
+	normalmaps,
 
 	use uuid:s,
-
-	maybe try and implement everything as an entity,
 
 	Maybe dont calculate the screen_size_world every frame? Maybe just on resize and camera changing z pos?,
 
 	u32 sprite ids?
 
-	generate an image atlas on init with all the images instead of loading induvidual images?
+	generate an image atlas on init with all the images instead of loading induvidual images?,
+	make it so we can load .aseprite files and not have to export the aseprite files to something like a png, https://github.com/blob1807/odin-aseprite,
 	fix sprites being wierd and having subpixel positions, automatically get the size of sprites based off off the amount of pixels in the img,
 	
-	UI system
+	UI system,
+
+	set up hot reloading? not needed right now since compile times are low, https://zylinski.se/posts/hot-reload-gameplay-code/,
 
 	fix updating text size, 
 	fix text being weird when changing z pos or perspective,
@@ -42,14 +42,12 @@ package main
 	make sure we use the same naming for pos, rot etc everywhere,
 
 	some sort of animation system for enteties,
-	maybe dont use cooldowns for the animations instead doing some sort of mod of the runtime might be better?,
 	
 	collisions,
 	
 	tilemap and other environment/map things,
 	map generation with wave function collapse,
 
-	lighting(normalmaps),
 	antialiasing is a little buggy?,
 	resolution scaling? or try and change the dpi/res with sokol?,
 	fix init_icon,
@@ -69,7 +67,7 @@ package main
 	Randys particle system for refrence https://gist.github.com/randyprime/0878ebcbe728139e5d91d903a5e2bd0b (not struct of arrays),
 
 
-	make it so cursor doesnt camerashake?
+	make it so cursor doesnt camerashake?,
 	cursor changes size when camera changes z pos whilst game is running,
 	
 	use enteties for abilities?,
@@ -93,6 +91,7 @@ import "draw"
 import "game"
 import "events"
 import "utils/cooldown"
+import "collisions"
 
 Spring :: struct{
 	//where the spring is attached
@@ -187,13 +186,17 @@ FIXED_UPDATE_TIME: f32 : 1/60
 
 //Every x seconds
 fixed_frame_cb :: proc(){
+	collisions.update_colliders()
+
 	game.fixed_update_game_state()
 }
 
 //Every frame
 frame_cb :: proc "c" (){
 	context = default_context
-	
+
+	check_reloads()
+
 	utils.update_utils()
 
 	cooldown.update_cooldowns()

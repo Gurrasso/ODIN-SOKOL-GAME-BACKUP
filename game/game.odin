@@ -31,7 +31,6 @@ Game_state :: struct{
 	cursor: Cursor,
 }
 
-
 gs: ^Game_state
 
 //test vars

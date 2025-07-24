@@ -192,4 +192,19 @@ get_next_index :: proc(array: $T, target: $T1) -> int{
 	return index
 }
 
+has_file_suffix :: proc(filename:cstring, suffix: cstring) -> bool{
+	filename := string(filename)
+	suffix := string(suffix)
 
+	if len(suffix)>len(filename) do return false
+
+
+	for i := len(suffix)-1; i >= 0; i -= 1{
+		schar := suffix[i]
+		fchar := filename[len(filename)-(len(suffix)-i)]
+
+		if schar != fchar do return false
+	}
+
+	return true
+}

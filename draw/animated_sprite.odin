@@ -74,6 +74,7 @@ update_animated_sprite_sheet_from_img :: proc(
 	obj.sprite_sheet = sprite_sheet
 	obj.sprite_count = sprite_count
 
+	// reset the uv to the first frame
 	update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
 }
 
@@ -94,6 +95,7 @@ init_animated_sprite_from_img :: proc(
 	sprite_count: uint = 1,
 ) -> string{
 
+	// set the uv to only show the first frame
 	uv := Vec4 { 0,0, 1 / auto_cast sprite_count, 1 }
 
 	id := id
@@ -134,6 +136,7 @@ init_animated_sprite_from_filename :: proc(
 	return init_animated_sprite_from_img(load_image(sprite_sheet_filename), transform, id, tex_index, draw_priority, color_offset, animation_speed, sprite_count)
 }
 
+// updates all the sprites to go to the next frame in the animation after a certain amount of time
 update_animated_sprites :: proc(){
 	for id in g.animated_sprite_objects{
 		obj := g.animated_sprite_objects[id]
