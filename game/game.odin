@@ -79,7 +79,7 @@ update_game_state :: proc(){
 
 	event_listener()
 
-	update_projectiles(&gs.projectiles)
+	update_projectiles()
 	//draw.move_camera_3D()
 	update_player()
 	

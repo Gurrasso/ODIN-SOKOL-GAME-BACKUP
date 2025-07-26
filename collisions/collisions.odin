@@ -29,9 +29,10 @@ Collider_type :: enum{
 Collider :: struct{
 	id: Collider_id,				//this is so the collider can find itself in the colliders map
 	shape: Collider_shape,
-	type: Collider_type, 
+	type: Collider_type,
 	pos: ^Vec2,
 	trigger_proc: proc(this_col: ^Collider, other_col: ^Collider),
+	hurt_proc: proc(damage: f32), // the other collider can trigger this in the trigger proc and the thing with this collider can say how to hurt it
 }
 
 Collider_id :: string
@@ -116,6 +117,7 @@ default_collider :: proc() -> Collider{
 		default_collider_shape(),
 		.Static,
 		&{0, 0},
+		nil,
 		nil,
 	}
 }

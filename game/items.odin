@@ -91,25 +91,25 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 
 //projectile
 Projectile :: struct{
+	index: int,
 	img: sg.Image,
 	lifetime: f32,
 	speed: f32,
 	damage: f32,
 	
 	transform: Transform,	
-	sprite_id: string,
+	sprite_id: draw.Sprite_id,
 	duration: f32,
 	dir: Vec2,
 }
 
-update_projectiles :: proc(projectiles: ^[dynamic]Projectile){
-	//update the projectiles and check if they should be removed	
-	for i := 0; i < len(projectiles); i+=1{
-		update_projectile(&projectiles[i])
-
-		if projectiles[i].duration > projectiles[i].lifetime{
-			remove_projectile(&projectiles[i])
-			ordered_remove(projectiles, i)
+update_projectiles :: proc(){
+	//update the projectiles and check if they should be removed
+	for i := 0; i < len(gs.projectiles); i+=1{
+		projectile := &gs.projectiles[i]
+		update_projectile(projectile)
+		if projectile.duration > projectile.lifetime{
+			remove_projectile(projectile)
 			i-=1
 		}
 	}
@@ -127,11 +127,13 @@ init_projectile :: proc(
 	projectile_data: Projectile, 
 	shoot_pos: Vec2, 
 	dir: Vec2, 
-	sprite_id: string
+	sprite_id: draw.Sprite_id
 ){
 	append(&gs.projectiles, projectile_data)
 	projectile := &gs.projectiles[len(gs.projectiles)-1]
 	transform := &projectile.transform
+
+	projectile.index = len(gs.projectiles)-1
 
 	transform.pos = shoot_pos
 	projectile.dir = dir
@@ -144,6 +146,14 @@ init_projectile :: proc(
 remove_projectile :: proc(projectile: ^Projectile){
 	//remove the projectile sprite
 	draw.remove_object(projectile.sprite_id)
+
+	index := projectile.index
+	ordered_remove(&gs.projectiles, index)
+
+	//change the index field of the other projectiles
+	for i in index..<len(gs.projectiles){
+		gs.projectiles[i].index -= 1
+	}
 }
 
 
