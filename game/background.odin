@@ -6,9 +6,10 @@ import "../events"
 
 // BACKGROUND
 
+//takes in a background color as a vec3
 init_background :: proc(color: Vec3 = {255, 255, 255}){
 	gs.background_sprite = draw.init_rect(
-		color = cu.sg_color(color3 = color),
+		color = cu.sg_color(color),
 		transform = Transform{size = draw.get_screen_size_in_world(0)}, 
 		draw_priority = .background
 	)

@@ -17,6 +17,7 @@ import "../draw"
 import cooldown "../utils/cooldown"
 import cu "../utils/color"
 import ev "../events"
+import col "../collisions"
 
 // ==============
 //     :GAME
@@ -60,14 +61,14 @@ init_game_state :: proc(){
 		text_rot = test_text_rot, 
 		pos = {0, 1}, 
 		scale = 0.03, 
-		color = cu.sg_color(color3 = Vec3{138,43,226}), 
+		color = cu.sg_color(Vec3{138,43,226}), 
 		font_id = "font1"
 	)
 
-	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
-	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
-	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
-	draw.init_rect(color = cu.sg_color(color4 = Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
+	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, 2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
+	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {0, -2.5}, size = {10, .2}, rot = {0, 0, 0}}, draw_priority = .environment)
+	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
+	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 
 	init_cursor()
 
@@ -93,7 +94,6 @@ update_game_state :: proc(){
 	update_background();
 
 	ev.mouse_move = {}
-	
 }
 
 //updates every x seconds

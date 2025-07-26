@@ -168,6 +168,7 @@ draw_draw_state :: proc(){
 
 	//do things for all text objects
 	for id in g.text_objects {
+		if !g.text_objects[id].draw do continue
 		for obj in g.text_objects[id].objects{
 
 			pos := obj.pos + Vec3{obj.rotation_pos_offset.x, obj.rotation_pos_offset.y, 0}
@@ -193,6 +194,8 @@ draw_draw_state :: proc(){
 	//do things for all objects
 	for id in g.sprite_objects {
 		for obj in g.sprite_objects[id].objects{
+			//if draw is false then dont draw the sprite
+			if !obj.draw do continue
 			
 			//model matrix turns vertex positions into world space positions
 			m := linalg.matrix4_translate_f32(obj.pos) * linalg.matrix4_from_yaw_pitch_roll_f32(to_radians(obj.rot.x), to_radians(obj.rot.y), to_radians(obj.rot.z))
@@ -213,8 +216,9 @@ draw_draw_state :: proc(){
 	}
 
 	//animated sprites
-	for id in g.animated_sprite_objects{
-		obj := g.animated_sprite_objects[id]	
+	for id, obj in g.animated_sprite_objects{
+		//if draw is false then dont draw the sprite
+		if !obj.draw do continue
 
 
 		//model matrix turns vertex positions into world space positions

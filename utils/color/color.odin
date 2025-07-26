@@ -17,23 +17,12 @@ sg_color :: proc{
 	sg_color_from_rgba,
 }
 
-
-sg_color_from_rgba :: proc (color4: Vec4) -> sg.Color{
-	color := color4
-
-	new_color := sg.Color{color.r/255, color.g/255, color.b/255, color.a/255}
-
-	return new_color
-
+sg_color_from_rgba :: proc (color: Vec4) -> sg.Color where type_of(color) == Vec4{
+	return sg.Color{color.r/255, color.g/255, color.b/255, color.a/255}
 }
 
-sg_color_from_rgb :: proc (color3: Vec3) -> sg.Color{
-	color := color3
-
-	new_color := sg.Color{color.r/255, color.g/255, color.b/255, 1}
-
-	return new_color
-
+sg_color_from_rgb :: proc (color: Vec3) -> sg.Color{
+	return sg.Color{color.r/255, color.g/255, color.b/255, 1}
 }
 
 sg_color_to_vec4 :: proc(c: sg.Color) -> Vec4{

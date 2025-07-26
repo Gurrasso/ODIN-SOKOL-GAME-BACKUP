@@ -19,8 +19,7 @@ cooldowns: map[Cooldown]Cooldown_object
 
 //updates all the cooldowns
 update_cooldowns :: proc(){
-	for id in cooldowns{
-		cooldown_object := &cooldowns[id]
+	for id, &cooldown_object in cooldowns{
 		if cooldown_object.enabled{
 			cooldown_object.duration += utils.dt
 			

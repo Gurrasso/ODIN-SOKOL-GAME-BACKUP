@@ -72,7 +72,7 @@ sg_range_from_struct :: proc(s: ^$T) -> sg.Range where intrinsics.type_is_struct
 	return { 
 		ptr = s, 
 		size = size_of(T)
-	 }
+	}
 }
 
 //function for the sokol graphics range from slice

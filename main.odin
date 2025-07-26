@@ -186,8 +186,6 @@ FIXED_UPDATE_TIME: f32 : 1/60
 
 //Every x seconds
 fixed_frame_cb :: proc(){
-	collisions.update_colliders()
-
 	game.fixed_update_game_state()
 }
 
@@ -211,8 +209,9 @@ frame_cb :: proc "c" (){
 		time_since_fixed_update = 0
 	}
 
-	//updates
 	game.update_game_state()
+
+	collisions.update_colliders()
 
 	if events.listen_screen_resized() do events.screen_resized = false
 

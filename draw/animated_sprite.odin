@@ -24,6 +24,7 @@ Animated_sprite_object :: struct{
 	res_id: cooldown.Res_object,
 	animation_speed: f32,
 	animation_enabled: bool,
+	draw: bool,
 }
 
 delete_animated_sprite :: proc(id: Sprite_id){
@@ -93,6 +94,7 @@ init_animated_sprite_from_img :: proc(
 	//how many seconds it takes for the animation to switch image
 	animation_speed: f32 = 0.1,
 	sprite_count: uint = 1,
+	draw: bool = true,
 ) -> string{
 
 	// set the uv to only show the first frame
@@ -118,6 +120,7 @@ init_animated_sprite_from_img :: proc(
 		utils.generate_string_id(),
 		animation_speed,
 		false,
+		draw,
 	}
 
 	return id
@@ -132,14 +135,14 @@ init_animated_sprite_from_filename :: proc(
 	color_offset: sg.Color = { 1,1,1,1 },
 	animation_speed: f32 = 0.1,
 	sprite_count: uint = 1,
+	draw: bool = true,
 ) -> string{
-	return init_animated_sprite_from_img(load_image(sprite_sheet_filename), transform, id, tex_index, draw_priority, color_offset, animation_speed, sprite_count)
+	return init_animated_sprite_from_img(load_image(sprite_sheet_filename), transform, id, tex_index, draw_priority, color_offset, animation_speed, sprite_count, draw)
 }
 
 // updates all the sprites to go to the next frame in the animation after a certain amount of time
 update_animated_sprites :: proc(){
-	for id in g.animated_sprite_objects{
-		obj := g.animated_sprite_objects[id]
+	for id, &obj in g.animated_sprite_objects{
 		if !obj.animation_enabled do continue
 		
 		if cooldown.run_every_seconds(obj.animation_speed, obj.res_id){
@@ -187,4 +190,13 @@ stop_animation :: proc(id: Sprite_id){
 	obj := &g.animated_sprite_objects[id]
 	update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
 	obj.animation_enabled = false
+}
+
+//toggles if the animated sprite should be drawn
+toggle_animated_sprite_draw :: proc(id: Sprite_id){
+	assert(id in g.animated_sprite_objects)
+
+	for id, &obj in g.animated_sprite_objects{
+		obj.draw = !obj.draw
+	}
 }

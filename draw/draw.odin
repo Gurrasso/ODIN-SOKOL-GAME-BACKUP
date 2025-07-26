@@ -12,6 +12,7 @@ import sg "../../sokol/gfx"
 import stbtt "vendor:stb/truetype"
 
 import "../utils"
+import cu "../utils/color"
 
 
 Transform :: utils.Transform
@@ -26,6 +27,7 @@ Sprite_object :: struct{
 	draw_priority: i32,
 	vertex_buffer: sg.Buffer,
 	size: Vec2,
+	draw: bool,
 }
 
 Sprite_object_group :: struct{
@@ -47,9 +49,10 @@ init_rect :: proc(
 	color: sg.Color = { 1,1,1,1 }, 
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, tex_index: Tex_indices = .default, 
-	draw_priority: Draw_layers = .default
+	draw_priority: Draw_layers = .default,
+	draw: bool = true
 ) -> string{
-	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color)	
+	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color, draw)	
 }
 
 
@@ -64,7 +67,8 @@ init_sprite_from_img :: proc(
 	id: Sprite_id = Null_sprite_id, 
 	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default, 
-	color_offset: sg.Color = { 1,1,1,1 }
+	color_offset: sg.Color = { 1,1,1,1 },
+	draw: bool = true
 ) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
@@ -85,6 +89,7 @@ init_sprite_from_img :: proc(
 		auto_cast draw_priority,
 		buffer,
 		transform.size,
+		draw,
 	})
 
 	return id
@@ -97,9 +102,11 @@ init_sprite_from_filename :: proc(
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, 
 	tex_index: Tex_indices = .default, 
-	draw_priority: Draw_layers = .default
+	draw_priority: Draw_layers = .default,
+	color_offset: sg.Color = { 1,1,1,1 },
+	draw: bool = true
 ) -> string{
-	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority)	
+	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority, color_offset, draw)	
 }
 
 //involves some code duplication
@@ -121,6 +128,7 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: S
 			object.draw_priority,
 			object.vertex_buffer,
 			object.size,
+			object.draw,
 		}
 	}
 }
@@ -137,6 +145,7 @@ update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 			object.draw_priority,
 			object.vertex_buffer,
 			object.size,
+			object.draw,
 		}
 	}
 }
@@ -154,6 +163,7 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 			object.draw_priority,
 			object.vertex_buffer,
 			object.size,
+			object.draw,
 		}
 	}
 }
@@ -170,6 +180,35 @@ update_sprite_size :: proc(size: Vec2, id: Sprite_id){
 
 		object.size = size
 	}
+}
+
+//toggles if the sprite should be drawn
+toggle_sprite_draw :: proc(id: Sprite_id){
+	assert(id in g.sprite_objects)
+	for &obj in g.sprite_objects[id].objects{
+		obj.draw = !obj.draw
+	}
+}
+
+toggle_text_object_draw :: proc(id: Sprite_id){
+	assert(id in g.sprite_objects)
+	obj := &g.text_objects[id]
+	obj.draw = !obj.draw
+}
+
+//toggles if the sprite, animated sprite or text_object should be drawn
+toggle_draw :: proc(id: Sprite_id){
+	if (id in g.sprite_objects){
+		for &obj in g.sprite_objects[id].objects{
+			obj.draw = !obj.draw
+		}
+	} else if (id in g.animated_sprite_objects){
+		obj := &g.animated_sprite_objects[id]
+		obj.draw = !obj.draw
+	}	else if id in g.text_objects{
+		obj := &g.text_objects[id]
+		obj.draw = !obj.draw
+	}else do panic("Id not in sprite_objects or animated_sprite_objects, toggle_draw proc")
 }
 
 //	DRAW_LAYERS
@@ -212,8 +251,8 @@ Text_object :: struct{
 	objects: [dynamic]Char_object,
 	pos: Vec2,
 	rot: Vec3,
-	id: string,
 	draw_priority: i32,
+	draw: bool,
 }
 
 FONT_INFO :: struct {
@@ -234,12 +273,13 @@ init_text :: proc(
 	scale: f32 = 0.05, 
 	color: sg.Color = { 1,1,1,1 }, 
 	text: string, 
-	font_id: string, 
-	text_object_id: string = "", 
+	font_id: Sprite_id, 
+	text_object_id: Sprite_id = "", 
 	text_rot : f32 = 0, 
 	draw_priority: Draw_layers = .text, 
-	draw_from_center: bool = false
-) -> string{
+	draw_from_center: bool = false,
+	draw: bool = true
+) -> Sprite_id{
 	using stbtt
 
 	assert(font_id in g.fonts)
@@ -316,7 +356,8 @@ init_text :: proc(
 		text_objects, 
 		text_object_id, pos, 
 		auto_cast draw_priority, 
-		draw_from_center
+		draw_from_center,
+		draw
 	)
 	
 	return text_object_id
@@ -325,10 +366,11 @@ init_text :: proc(
 append_text_object :: proc(
 	rot: Vec3, 
 	text_objects: [dynamic]Char_object, 
-	text_object_id: string, 
+	text_object_id: Sprite_id, 
 	text_pos: Vec2, 
 	draw_priority: i32, 
-	draw_from_center: bool
+	draw_from_center: bool,
+	draw: bool
 ){
 	text_center : Vec2
 	text_rot : Vec3 = rot
@@ -365,8 +407,8 @@ append_text_object :: proc(
 		text_objects,
 		text_center,
 		text_rot,
-		text_object_id,
 		draw_priority,
+		draw,
 	}
 
 	//show the center point of the text
@@ -455,13 +497,13 @@ update_text :: proc{
 }
 
 //not super efficient, might fix later
-update_text_object :: proc(pos: Vec2, rot: f32, id: string){
+update_text_object :: proc(pos: Vec2, rot: f32, id: Sprite_id){
 	update_text_rot(rot, id)
 	update_text_pos(pos, id)
 
 }
 
-update_text_rot :: proc(rot: f32, id: string){
+update_text_rot :: proc(rot: f32, id: Sprite_id){
 	assert(id in g.text_objects)
 
 	text_object := &g.text_objects[id]
@@ -477,7 +519,7 @@ update_text_rot :: proc(rot: f32, id: string){
 	}
 }
 
-update_text_pos :: proc(pos: Vec2, id: string){
+update_text_pos :: proc(pos: Vec2, id: Sprite_id){
 	assert(id in g.text_objects)
 
 	text_object := &g.text_objects[id]
@@ -491,18 +533,26 @@ update_text_pos :: proc(pos: Vec2, id: string){
 }
 
 
-//removing.sprite_objects
-
-remove_object ::	proc(id: Sprite_id){
+remove_sprite_object ::	proc(id: Sprite_id){
 	assert(id in g.sprite_objects)
 
 	delete_key(&g.sprite_objects, id)
 }
 
-remove_text_object :: proc(id: string) {
+remove_text_object :: proc(id: Sprite_id) {
 	assert(id in g.text_objects)
 
 	delete_key(&g.text_objects, id)
+}
+
+remove_object	:: proc(id: Sprite_id){
+	if (id in g.sprite_objects){
+		delete_key(&g.sprite_objects, id)
+	} else if (id in g.animated_sprite_objects){
+		delete_key(&g.animated_sprite_objects, id)
+	}	else if id in g.text_objects{
+		delete_key(&g.text_objects, id)
+	}else do panic("Id not in sprite_objects or animated_sprite_objects, toggle_draw proc")
 }
 
 // Intersect a ray with a plane Z = target_z
