@@ -225,7 +225,6 @@ Draw_layers :: enum i32{
 	top = 7,
 }
 
-
 // TEX_INDICES
 
 Tex_indices :: enum u8{

@@ -10,6 +10,7 @@ import sapp "../../sokol/app"
 import sg "../../sokol/gfx"
 
 import "../utils"
+import ev "../events"
 
 Asympatic_object :: struct{
 	depletion: f32,
@@ -179,14 +180,14 @@ update_camera_position :: proc(position: Vec2, rotation: f32){
 
 
 //function for moving around camera in 3D
-/*move_camera_3D :: proc() {
+move_camera_3D :: proc() {
 	move_input: Vec2
-	if key_down[.W] do move_input.y = 1
-	else if key_down[.S] do move_input.y = -1
-	if key_down[.A] do move_input.x = -1
-	else if key_down[.D] do move_input.x = 1
+	if ev.key_down[.W] do move_input.y = 1
+	else if ev.key_down[.S] do move_input.y = -1
+	if ev.key_down[.A] do move_input.x = -1
+	else if ev.key_down[.D] do move_input.x = 1
 
-	look_input: Vec2 = -mouse_move * LOOK_SENSITIVITY
+	look_input: Vec2 = -ev.mouse_move * LOOK_SENSITIVITY
 	camera.look += look_input
 	camera.look.x = math.wrap(camera.look.x, 360)
 	camera.look.y = math.clamp(camera.look.y, -89, 89)
@@ -198,11 +199,11 @@ update_camera_position :: proc(position: Vec2, rotation: f32){
 
 	move_dir := forward * move_input.y + right * move_input.x
 
-	motion := linalg.normalize0(move_dir) * g.player.move_speed * utils.dt
+	motion := linalg.normalize0(move_dir) * 6 * utils.dt
 	camera.position += motion
 
 	camera.target = camera.position + forward
-}*/
+}
 
 //shake the camera by setting the trauma
 shake_camera :: proc(trauma: f32){

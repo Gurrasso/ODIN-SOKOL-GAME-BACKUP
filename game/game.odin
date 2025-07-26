@@ -80,7 +80,7 @@ update_game_state :: proc(){
 	event_listener()
 
 	update_projectiles(&gs.projectiles)
-	//move_camera_3D()
+	//draw.move_camera_3D()
 	update_player()
 	
 	update_camera()
@@ -197,7 +197,12 @@ init_player :: proc(){
 	init_player_abilities()
 
 	//init the players sprite
-	gs.player.sprite_id = draw.init_animated_sprite(sprite_sheet_filename = gs.player.idle_sprite_filename, transform = gs.player.transform, sprite_count = 8, animation_speed = 0.14)
+	gs.player.sprite_id = draw.init_animated_sprite(
+		sprite_sheet_filename = gs.player.idle_sprite_filename, 
+		transform = gs.player.transform, 
+		sprite_count = 8, 
+		animation_speed = 0.15
+	)
 	draw.start_animation(gs.player.sprite_id)
 	//init the players item_holder
 	init_item_holder(&gs.player.holder)
@@ -276,7 +281,7 @@ update_player :: proc() {
 	}
 
 	//update sprites animation speed
-	if utils.get_vector_magnitude(player.move_dir) <= 0 do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.14)
+	if utils.get_vector_magnitude(player.move_dir) <= 0 do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.15)
 	else if gs.player.sprint.enabled do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
 	else do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
 

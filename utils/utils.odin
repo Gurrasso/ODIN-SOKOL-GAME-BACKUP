@@ -183,11 +183,8 @@ get_index :: proc(array: $T, target: $T1) -> int{
 }
 
 get_next_index :: proc(array: $T, target: $T1) -> int{
-	index := 0
 	target_index := get_index(array, target) 
-	if target_index < len(array)-1{
-		index = target_index + 1
-	}
+	index := (target_index + 1) % len(array)
 
 	return index
 }
