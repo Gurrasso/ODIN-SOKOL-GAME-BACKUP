@@ -80,7 +80,16 @@ init_game_state :: proc(){
 		.Static,
 		&test_vec2,
 		&test_rot,
-		proc(col1: ^col.Collider, col2: ^col.Collider){ log.debug ("ewadawd") },
+		nil,
+		nil
+	})
+	col.init_collider(col.Collider{
+		"",
+		col.Rect_collider_shape{{.2, 4.8}},
+		.Static,
+		&test_vec21,
+		&test_rot,
+		nil,
 		nil
 	})
 }
@@ -88,6 +97,9 @@ init_game_state :: proc(){
 test_vec2: Vec2 = {0, 2.5}
 test_rot: f32 = 0
 
+test_vec21: Vec2 = {-4.9, 0}
+
+//this happens before the collision check
 update_game_state :: proc(){
 
 	event_listener()
@@ -96,15 +108,21 @@ update_game_state :: proc(){
 	//draw.move_camera_3D()
 	update_player()
 	
-	update_camera()
-
-	update_cursor()
-	
 	test_text_rot -= test_text_rot_speed * utils.dt
 	draw.update_text(test_text_rot, test_text_id)
 
+}
 
-	update_background();
+//this happens after the collision check
+draw_game_state :: proc(){
+
+	update_camera()
+
+	update_cursor()
+
+	update_background()
+
+	draw_player()
 
 	ev.mouse_move = {}
 }
@@ -337,8 +355,6 @@ update_player :: proc() {
 	holder.transform.rot.z = new_holder_rotation
 	holder.transform.rot.x = transform.rot.z
 
-
-	
 	//where the bullet should come from if it is a gun
 	shoot_pos_offset := holder_rotation_vector * holder_item_data.size.x/2
 	shoot_pos := player.holder.transform.pos + shoot_pos_offset
@@ -347,9 +363,12 @@ update_player :: proc() {
 	//creates a player rotation based of the movement
 	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
 
-	draw.update_animated_sprite(transform = transform^, id = player.sprite_id)
 
 	player.last_move_dir = player.move_dir
+}
+
+draw_player :: proc(){
+	draw.update_animated_sprite(transform = gs.player.transform, id = gs.player.sprite_id)
 }
 
 

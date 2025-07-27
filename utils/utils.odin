@@ -100,6 +100,15 @@ vec2_rotation :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
 	return Vec2{new_pos2d.x, -new_pos2d.y} - objpos
 }
 
+vec2_rotation_not_relative :: proc(objpos: Vec2, centerpos: Vec2, rot: f32) -> Vec2 {
+	obj_xform := xform_rotate(rot)
+	obj_xform *= xform_translate(Vec2{objpos.x, -objpos.y} - {centerpos.x, -centerpos.y})
+
+	new_pos2d := Vec2{obj_xform[3][0], obj_xform[3][1]} + Vec2{centerpos.x, -centerpos.y}
+	return Vec2{new_pos2d.x, -new_pos2d.y}
+}
+ 
+
 vec2_to_vec3 :: proc(vec: Vec2) -> Vec3{
 	return Vec3{vec.x, vec.y, 0}
 }

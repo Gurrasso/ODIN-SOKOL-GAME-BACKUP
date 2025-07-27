@@ -65,13 +65,14 @@ update_colliders :: proc(){
 		for id, &col2 in colliders{
 			if col1 == col2 do continue
 
-			if check_collision(col1, col2) do resolve_collision(&col1, &col2)
+			colliding, mtv := check_collision(col1, col2)
+			if colliding do resolve_collision(&col1, &col2, mtv)
 			
 		}
 	}
 }
 
-resolve_collision :: proc(col1: ^Collider, col2: ^Collider){
+resolve_collision :: proc(col1: ^Collider, col2: ^Collider, mtv: Vec2){
 	// do the collider trigger proc
 	if col1.trigger_proc != nil do col1.trigger_proc(col1, col2)
 	if col2.trigger_proc != nil do col2.trigger_proc(col2, col1)
@@ -82,19 +83,39 @@ resolve_collision :: proc(col1: ^Collider, col2: ^Collider){
 	//resolve collision
 	
 	if col1.type == .Dynamic && col2.type == .Dynamic{		//both colliders are dynamic
-		
-	}else{																								// one collider is dynamic and one is static
+		//move both colliders equally
+		if col1.pos^.y > col2.pos^.y {
+			col1.pos^.y+=mtv.y/2
+			col2.pos^.y-=mtv.y/2
+		}else {
+			col1.pos^.y-=mtv.y/2
+			col2.pos^.y+=mtv.y/2
+		}
+		if col1.pos^.x > col2.pos^.x {
+			col1.pos^.x+=mtv.x/2
+			col2.pos^.x-=mtv.x/2
+		}else {
+			col1.pos^.x-=mtv.x/2
+			col2.pos^.x+=mtv.x/2
+		}
+	}else{	// one collider is dynamic and one is static
 		//which collider is dynamic and which is static
 		dynamic_col : ^Collider = col1.type == .Dynamic ? col1 : col2
 		static_col : ^Collider = dynamic_col == col1 ? col2 : col1
 
+		//move only the dynamic collider
+		if dynamic_col.pos^.y > static_col.pos^.y do dynamic_col.pos^.y+=mtv.y
+		else do dynamic_col.pos^.y -= mtv.y
+		if dynamic_col.pos^.x > static_col.pos^.x do dynamic_col.pos^.x+=mtv.x
+		else do dynamic_col.pos^.x -= mtv.x
 	}
 
 }
 
-check_collision :: proc(col1: Collider, col2: Collider) -> bool{
+//returns true if they are colliding and returns a vector to resolve the collision
+check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 	//only dynamic colliders move and collide with things can actually collide with things
-	if col1.type != .Dynamic && col2.type != .Dynamic do return false
+	if col1.type != .Dynamic && col2.type != .Dynamic do return false, {0, 0}
 
 	_, col1_circle := col1.shape.(Circle_collider_shape)
 	_, col2_circle := col2.shape.(Circle_collider_shape) 
@@ -104,10 +125,16 @@ check_collision :: proc(col1: Collider, col2: Collider) -> bool{
 		return check_circle_circle_collision(col1, col2)
 	}else if col1_circle || col2_circle { // one is a circle
 
-		return false
 	}else{ // both are polygons
 		verts1 := get_vertecies(col1)
 		verts2 := get_vertecies(col2)
+
+		col1_max_dist: f32 = utils.get_vector_magnitude(col1.shape.(Rect_collider_shape).size) 
+		col2_max_dist: f32 = utils.get_vector_magnitude(col2.shape.(Rect_collider_shape).size)
+
+		mtv_dist: f32 = col1_max_dist > col2_max_dist ?  col1_max_dist : col2_max_dist 
+		mtv_axis: Vec2 = {1, 0}
+
 
 		// loop through all the sides of both polygons and check if we can find a line that devides them if we can return false otherwise continue checking, if we cant find one then they are colliding
 		for i in 0..<len(verts1){
@@ -115,37 +142,48 @@ check_collision :: proc(col1: Collider, col2: Collider) -> bool{
 			//get the min and max values of the verts on the axis
 			verts1_min, verts1_max := project_polygon_to_axis(verts1, axis)
 			verts2_min, verts2_max := project_polygon_to_axis(verts2, axis)
-			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, col1.pos^, col2.pos^, axis) do return false
-			else do continue
+			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, axis) do return false, {0, 0}
+
+			overlap := math.min(verts2_max-verts1_min, verts1_max-verts2_min)
+			if overlap < mtv_dist{
+				mtv_dist = overlap
+				mtv_axis = axis
+			}
 		}
 		for i in 0..<len(verts2){
 			axis := get_axis(verts2[i], (verts2[(i+1) % len(verts2)]))
 			//get the min and max values of the verts on the axis
 			verts1_min, verts1_max := project_polygon_to_axis(verts1, axis)
 			verts2_min, verts2_max := project_polygon_to_axis(verts2, axis)
-			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, col1.pos^, col2.pos^, axis) do return false
-			else do continue
+			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, axis) do return false, {0, 0}
+
+			overlap := math.min(verts2_max-verts1_min, verts1_max-verts2_min)
+			if overlap < mtv_dist{
+				mtv_dist = overlap
+				mtv_axis = axis
+			}
 		}
 
-		return true
+		return true, linalg.abs(mtv_dist*mtv_axis)
 	}
+
+	return false, {0, 0}
 	
 }
 
 //check if two circles are colliding
-check_circle_circle_collision :: proc(col1: Collider, col2: Collider) -> bool{
+check_circle_circle_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 	r1 := col1.shape.(Circle_collider_shape).radius
 	r2 := col2.shape.(Circle_collider_shape).radius
 	pos1 := col1.pos^
 	pos2 := col2.pos^
 
-	if math.pow((pos2.x-pos1.x),2) + math.pow((pos2.y-pos1.y), 2) <= math.pow((r1+r2),2) do return true
-	else do return false
+	overlap := (math.pow((r1+r2),2) - (math.pow((pos2.x-pos1.x),2) + math.pow((pos2.y-pos1.y), 2)))
+	if overlap > 0 do return true, linalg.abs(overlap * linalg.normalize0(pos1-pos2))
+	else do return false, {0, 0}
 }
 
-get_mtv :: proc()
-
-check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, verts2_max: f32, pos1: Vec2, pos2: Vec2, axis: Vec2) -> bool{
+check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, verts2_max: f32, axis: Vec2) -> bool{
 	// quick overlap test of the min and max from both polygons
   if  verts1_min - verts2_max > 0 || verts2_min - verts1_max > 0 {
   	return true							//there is a gap 
@@ -200,7 +238,7 @@ get_vertecies :: proc(col: Collider) -> [dynamic]Vec2{
 		//rotate the vertecies
 		if rot != 0 {
 			for &vert in vertecies{
-				vert = utils.vec2_rotation(vert, pos, rot)
+				vert = utils.vec2_rotation_not_relative(vert, pos, rot)
 			}
 		}
 	case Circle_collider_shape: // if the collider is a circle

@@ -8,6 +8,8 @@ package main
 
 	maybe enums should have all caps,
 
+	look into wether the thing we have for choosing in what direction to move the colliders in the collision resolution is okay, maybe use the min and max values instead,
+
 	make sure we arent leaking a bunch of memory, implement some test?,
 	delete vertex buffers and images that arent in use? Maybe rework the vertex buffer system a little?,
 	
@@ -43,7 +45,6 @@ package main
 
 	some sort of animation system for enteties,
 	
-	collisions,
 	
 	tilemap and other environment/map things,
 	map generation with wave function collapse,
@@ -213,6 +214,8 @@ frame_cb :: proc "c" (){
 
 	collisions.update_colliders()
 
+	game.draw_game_state()
+	
 	if events.listen_screen_resized() do events.screen_resized = false
 
 	draw.draw_draw_state()
