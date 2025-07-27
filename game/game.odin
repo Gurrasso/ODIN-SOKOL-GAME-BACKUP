@@ -73,7 +73,20 @@ init_game_state :: proc(){
 	init_cursor()
 
 	init_background({130, 130, 130})
+
+	col.init_collider(col.Collider{
+		"",
+		col.Rect_collider_shape{{10, .2}},
+		.Static,
+		&test_vec2,
+		&test_rot,
+		proc(col1: ^col.Collider, col2: ^col.Collider){ log.debug ("ewadawd") },
+		nil
+	})
 }
+
+test_vec2: Vec2 = {0, 2.5}
+test_rot: f32 = 0
 
 update_game_state :: proc(){
 
@@ -206,6 +219,17 @@ init_player :: proc(){
 	draw.start_animation(gs.player.sprite_id)
 	//init the players item_holder
 	init_item_holder(&gs.player.holder)
+
+	col.init_collider(col.Collider{
+		"",
+		col.Rect_collider_shape{Vec2{0.7, 1.4}},
+		.Dynamic,
+		&gs.player.transform.pos,
+		&gs.player.transform.rot.z,
+		nil,
+		nil
+	})
+
 }
 
 
@@ -299,7 +323,7 @@ update_player :: proc() {
 	holder_rotation_pos := transform.pos + ( player.item_offset.x * player.xflip)
 	new_holder_pos := Vec2{(player.item_offset.x)*-player.xflip, transform.pos.y}
 
-	holder_rotation_vector := linalg.normalize0(gs.cursor.world_transform.pos-(transform.pos))
+	holder_rotation_vector := linalg.normalize0(gs.cursor.world_transform.pos-Vec2{transform.pos.x, transform.pos.y + player.item_offset.y})
 	if holder_rotation_vector == {0, 0} do holder_rotation_vector = {1, 0}
 
 
