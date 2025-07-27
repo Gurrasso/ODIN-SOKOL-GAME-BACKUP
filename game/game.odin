@@ -203,7 +203,7 @@ init_player :: proc(){
 		running_sprite_filename = "./src/assets/sprite_sheets/running_template_character.png",
 		
 		transform = {
-			size = { 0.7,1.4 }
+			size = { 0.7,0.96 }
 		},
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
@@ -222,7 +222,7 @@ init_player :: proc(){
 		},
 		
 		//how far away from the player an item is
-		item_offset = Vec2{0.2, -0.34},
+		item_offset = Vec2{0.2, -0.21},
 	}
 	gs.player.move_speed = gs.player.default_move_speed
 	init_player_abilities()
@@ -240,7 +240,7 @@ init_player :: proc(){
 
 	col.init_collider(col.Collider{
 		"",
-		col.Rect_collider_shape{Vec2{0.7, 1.4}},
+		col.Rect_collider_shape{gs.player.transform.size},
 		.Dynamic,
 		&gs.player.transform.pos,
 		&gs.player.transform.rot.z,
