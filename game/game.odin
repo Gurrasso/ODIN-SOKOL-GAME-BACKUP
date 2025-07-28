@@ -18,6 +18,7 @@ import cooldown "../utils/cooldown"
 import cu "../utils/color"
 import ev "../events"
 import col "../collisions"
+import "../sound"
 
 // ==============
 //     :GAME
@@ -92,6 +93,9 @@ init_game_state :: proc(){
 		nil,
 		nil
 	})
+
+
+
 }
 
 test_vec2: Vec2 = {0, 2.5}
@@ -101,6 +105,8 @@ test_vec21: Vec2 = {-4.9, 0}
 
 //this happens before the collision check
 update_game_state :: proc(){
+	
+	sound.play_continuously(name = "event:/Forest-theme", pos = {0, 0})
 
 	event_listener()
 

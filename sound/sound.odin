@@ -2,6 +2,8 @@ package sound
 
 /*
 
+Code made by Randygg tweaked by me
+
 Helpers for playing sound via FMOD.
 
 Built to be a standalone package with no external dependencies.
@@ -49,9 +51,9 @@ init :: proc(volume: f32) {
 
 	state.master_volume = volume
 
-	//when DEBUG {
-	fmod_error_check(fcore.Debug_Initialize(fcore.DEBUG_LEVEL_WARNING, fcore.DEBUG_MODE.DEBUG_MODE_TTY, nil, "fmod.file"))
-	//}
+	when ODIN_DEBUG {
+		fmod_error_check(fcore.Debug_Initialize(fcore.DEBUG_LEVEL_WARNING, fcore.DEBUG_MODE.DEBUG_MODE_TTY, nil, "fmod.file"))
+	}
 
 	fmod_error_check(System_Create(&system, fcore.VERSION))
 	
@@ -156,7 +158,7 @@ unique_id := fmt.tprint(enemy.handle.id)
 play_emitter("event:/ambient_enemy_groan", unique_id, pos=enemy.pos)
 ```
 */
-play_continuously :: proc(name: string, unique_id: string, pos := INVALID_POS) {
+play_continuously :: proc(name: string, unique_id: string = "", pos := INVALID_POS) {
 
 	unique_id := fmt.tprintf("%v%v", name, unique_id)
 

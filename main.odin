@@ -4,7 +4,7 @@ package main
 /*
 	TODO: 
 
-	use fmod?
+	fmod splash screen,
 
 	maybe enums should have all caps,
 
@@ -228,6 +228,10 @@ frame_cb :: proc "c" (){
 	if events.listen_screen_resized() do events.screen_resized = false
 
 	draw.draw_draw_state()
+
+	//update sound and make the listener pos the player 
+	sound.update(game.gs.player.transform.pos)
+	sound.update_sound_emitters()
 }
 
 //Events
