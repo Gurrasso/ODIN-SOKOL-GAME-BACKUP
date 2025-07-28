@@ -82,6 +82,12 @@ import "base:runtime"
 import "core:log"
 import "core:os"
 import "core:math/linalg"
+import "core:sync"
+import "core:strings"
+import "core:math"
+import "core:fmt"
+import "core:time"
+import "base:builtin"
 // sokol imports
 import sapp "../sokol/app"
 import shelpers "../sokol/helpers"
@@ -93,6 +99,7 @@ import "game"
 import "events"
 import "utils/cooldown"
 import "collisions"
+import "sound"
 
 Spring :: struct{
 	//where the spring is attached
@@ -160,6 +167,8 @@ init_cb :: proc "c" (){
 	utils.init_utils()
 
 	WHITE_IMAGE = draw.WHITE_IMAGE
+
+	sound.init(100)
 
 	draw.init_draw_state()
 
