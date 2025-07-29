@@ -7,7 +7,6 @@ import "core:math"
 import "core:math/linalg"
 
 import "../utils/"
-import "../draw"
 
 // the union allows for defining multible different shapes containing different data
 Collider_shape :: union #no_nil{
@@ -133,6 +132,8 @@ check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 		circle_max_dist: f32 = circle_collider.shape.(Circle_collider_shape).radius*2 
 		polygon_max_dist: f32 = utils.get_vector_magnitude(polygon_collider.shape.(Rect_collider_shape).size)
 
+
+		//minimum translation vector
 		mtv_dist: f32 = circle_max_dist > circle_max_dist ?  polygon_max_dist : polygon_max_dist 
 		mtv_axis: Vec2 = {0, 0}
 
@@ -186,6 +187,7 @@ check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 		col1_max_dist: f32 = utils.get_vector_magnitude(col1.shape.(Rect_collider_shape).size) 
 		col2_max_dist: f32 = utils.get_vector_magnitude(col2.shape.(Rect_collider_shape).size)
 
+		//minimum translation vector
 		mtv_dist: f32 = col1_max_dist > col2_max_dist ?  col1_max_dist : col2_max_dist 
 		mtv_axis: Vec2 = {0, 0}
 
@@ -232,9 +234,11 @@ check_circle_circle_collision :: proc(col1: Collider, col2: Collider) -> (bool, 
 	pos1 := col1.pos^
 	pos2 := col2.pos^
 
-	overlap := (math.pow((r1+r2),2) - (math.pow((pos2.x-pos1.x),2) + math.pow((pos2.y-pos1.y), 2)))
-	if overlap > 0 do return true, linalg.abs(overlap * linalg.normalize0(pos1-pos2))
+	//get the overlap by taking the radius of both circles and subtracting the distance between the circles
+	overlap :=  (r1+r2) - utils.get_vector_magnitude(pos1-pos2)
+	if overlap > 0 do return true, linalg.abs((overlap) * linalg.normalize0(pos1-pos2))
 	else do return false, {0, 0}
+	return false,{0,0}
 }
 
 check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, verts2_max: f32) -> bool{
@@ -312,14 +316,18 @@ get_vertecies :: proc(col: Collider) -> [dynamic]Vec2{
 			}
 		}
 	case Circle_collider_shape: // if the collider is a circle
-		log.debug("Circles dont have vertecies")
+		panic("Circles dont have vertecies")
 	case: // else
-		log.debug("Invalid collider shape in get_vertecies")
+		panic("Invalid collider shape in get_vertecies")
 	}
 
 	return vertecies
 }
 
+remove_collider :: proc(id: Collider_id){
+	assert(id in colliders)
+	delete_key(&colliders, id)
+}
 
 query_collider :: proc(id: Collider_id) -> Collider{
 	assert(id in colliders)

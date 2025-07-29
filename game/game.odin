@@ -253,7 +253,6 @@ init_player :: proc(){
 		nil,
 		nil
 	})
-
 }
 
 
@@ -332,15 +331,9 @@ update_player :: proc() {
 	if utils.get_vector_magnitude(player.move_dir) <= 0 do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.15)
 	else if gs.player.sprint.enabled do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
 	else do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
-	
 
 	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
 	transform.pos += motion
-
-	
-	//creates a player rotation based of the movement
-	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
-
 
 	player.last_move_dir = player.move_dir
 }
