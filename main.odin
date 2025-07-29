@@ -5,6 +5,9 @@ package main
 	TODO: 
 
 	fmod splash screen,
+	make fmod shared objects not have to be exported every build and maybe not have to be included with the bin?,
+
+	make a universal build file for both windows and linux and include sokol and shdc in the project files,
 
 	maybe enums should have all caps,
 
@@ -44,7 +47,6 @@ package main
 	make sure we use the same naming for pos, rot etc everywhere,
 
 	some sort of animation system for enteties,
-	
 	
 	tilemap and other environment/map things,
 	map generation with wave function collapse,
@@ -121,7 +123,6 @@ Spring :: struct{
 // ==============
 
 main :: proc(){
-	//logger
 	context.logger = log.create_console_logger()
 	default_context = context
 	
