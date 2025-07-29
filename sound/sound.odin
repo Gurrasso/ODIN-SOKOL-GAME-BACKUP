@@ -49,7 +49,7 @@ init :: proc(volume: f32) {
 	using fstudio
 	using state
 
-	state.master_volume = volume
+	master_volume = volume
 
 	when ODIN_DEBUG {
 		fmod_error_check(fcore.Debug_Initialize(fcore.DEBUG_LEVEL_WARNING, fcore.DEBUG_MODE.DEBUG_MODE_TTY, nil, "fmod.file"))

@@ -72,6 +72,7 @@ update_colliders :: proc(){
 	}
 }
 
+//resolves collisions using a minimum translation vector
 resolve_collision :: proc(col1: ^Collider, col2: ^Collider, mtv: Vec2){
 	// do the collider trigger proc
 	if col1.trigger_proc != nil do col1.trigger_proc(col1, col2)
@@ -124,7 +125,60 @@ check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 	if col1_circle && col2_circle { // both are circles
 		return check_circle_circle_collision(col1, col2)
 	}else if col1_circle || col2_circle { // one is a circle
+		circle_collider := col1_circle ? col1 : col2
+		polygon_collider := col1_circle ? col2 : col1
 
+		polygon_verts := get_vertecies(polygon_collider)
+
+		circle_max_dist: f32 = circle_collider.shape.(Circle_collider_shape).radius*2 
+		polygon_max_dist: f32 = utils.get_vector_magnitude(polygon_collider.shape.(Rect_collider_shape).size)
+
+		mtv_dist: f32 = circle_max_dist > circle_max_dist ?  polygon_max_dist : polygon_max_dist 
+		mtv_axis: Vec2 = {0, 0}
+
+		//first check every side of the polygon then the axis from the circle to the polygon
+
+		for i in 0..<len(polygon_verts){
+			axis := get_normal_axis(polygon_verts[i], (polygon_verts[(i+1) % len(polygon_verts)]))
+			//get the min and max values of the verts on the axis
+			circle_min, circle_max := project_circle_to_axis(circle_collider.pos^, circle_collider.shape.(Circle_collider_shape).radius, axis)
+			polygon_min, polygon_max := project_polygon_to_axis(polygon_verts, axis)
+			if check_verts_on_axis(polygon_min, polygon_max, circle_min, circle_max) do return false, {0, 0}
+
+			overlap := math.min(circle_max-polygon_min, circle_max-polygon_min)
+			if overlap < mtv_dist{
+				mtv_dist = overlap
+				mtv_axis = axis
+			}
+		}
+
+		closest_vert: Vec2 = polygon_verts[0]
+		closest_dist: f32 = utils.get_vector_magnitude(closest_vert-circle_collider.pos^)
+		//loop through all the vertecies of the polygon to get the closest one to the circle
+		for vert in polygon_verts{
+			
+			dist := utils.get_vector_magnitude(vert-circle_collider.pos^)
+
+			if dist < closest_dist{
+				closest_dist = dist
+				closest_vert = vert
+			}
+		}
+
+		//check for a gap on the axis from the circle center to the closest vert
+		axis := get_axis_vert_to_vert(closest_vert, circle_collider.pos^)
+		circle_min, circle_max := project_circle_to_axis(circle_collider.pos^, circle_collider.shape.(Circle_collider_shape).radius, axis)
+		polygon_min, polygon_max := project_polygon_to_axis(polygon_verts, axis)
+		if check_verts_on_axis(polygon_min, polygon_max, circle_min, circle_max) do return false, {0, 0}
+
+
+		overlap := math.min(circle_max-polygon_min, circle_max-polygon_min)
+		if overlap < mtv_dist{
+			mtv_dist = overlap
+			mtv_axis = axis
+		}
+
+		return true, linalg.abs(mtv_dist*mtv_axis)
 	}else{ // both are polygons
 		verts1 := get_vertecies(col1)
 		verts2 := get_vertecies(col2)
@@ -133,16 +187,16 @@ check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 		col2_max_dist: f32 = utils.get_vector_magnitude(col2.shape.(Rect_collider_shape).size)
 
 		mtv_dist: f32 = col1_max_dist > col2_max_dist ?  col1_max_dist : col2_max_dist 
-		mtv_axis: Vec2 = {1, 0}
+		mtv_axis: Vec2 = {0, 0}
 
-
+		//some code duplication but "is fine"
 		// loop through all the sides of both polygons and check if we can find a line that devides them if we can return false otherwise continue checking, if we cant find one then they are colliding
 		for i in 0..<len(verts1){
-			axis := get_axis(verts1[i], (verts1[(i+1) % len(verts1)]))
+			axis := get_normal_axis(verts1[i], (verts1[(i+1) % len(verts1)]))
 			//get the min and max values of the verts on the axis
 			verts1_min, verts1_max := project_polygon_to_axis(verts1, axis)
 			verts2_min, verts2_max := project_polygon_to_axis(verts2, axis)
-			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, axis) do return false, {0, 0}
+			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max) do return false, {0, 0}
 
 			overlap := math.min(verts2_max-verts1_min, verts1_max-verts2_min)
 			if overlap < mtv_dist{
@@ -151,11 +205,11 @@ check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
 			}
 		}
 		for i in 0..<len(verts2){
-			axis := get_axis(verts2[i], (verts2[(i+1) % len(verts2)]))
+			axis := get_normal_axis(verts2[i], (verts2[(i+1) % len(verts2)]))
 			//get the min and max values of the verts on the axis
 			verts1_min, verts1_max := project_polygon_to_axis(verts1, axis)
 			verts2_min, verts2_max := project_polygon_to_axis(verts2, axis)
-			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max, axis) do return false, {0, 0}
+			if check_verts_on_axis(verts1_min, verts1_max, verts2_min, verts2_max) do return false, {0, 0}
 
 			overlap := math.min(verts2_max-verts1_min, verts1_max-verts2_min)
 			if overlap < mtv_dist{
@@ -183,7 +237,7 @@ check_circle_circle_collision :: proc(col1: Collider, col2: Collider) -> (bool, 
 	else do return false, {0, 0}
 }
 
-check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, verts2_max: f32, axis: Vec2) -> bool{
+check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, verts2_max: f32) -> bool{
 	// quick overlap test of the min and max from both polygons
   if  verts1_min - verts2_max > 0 || verts2_min - verts1_max > 0 {
   	return true							//there is a gap 
@@ -203,7 +257,23 @@ project_polygon_to_axis :: proc(vertecies: [dynamic]Vec2, axis: Vec2) -> (min: f
 	return verts_min, verts_max
 }
 
-get_axis :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
+project_circle_to_axis :: proc(center: Vec2, radius: f32, axis: Vec2) -> (min: f32, max: f32){
+	vertecies: [dynamic]Vec2
+	
+	verts_min := linalg.vector_dot(axis, center)
+	verts_max := verts_min
+
+	verts_min -= radius
+	verts_max += radius
+
+	return verts_min, verts_max
+}
+
+get_axis_vert_to_vert :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
+	return linalg.normalize0(vert1-vert2)
+}
+
+get_normal_axis :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
 	// get the perpendicular axis
   axis := Vec2{ 
   	-(vert2.y - vert1.y), 

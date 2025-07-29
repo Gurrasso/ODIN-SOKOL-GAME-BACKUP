@@ -169,7 +169,7 @@ init_cb :: proc "c" (){
 
 	WHITE_IMAGE = draw.WHITE_IMAGE
 
-	sound.init(100)
+	sound.init(1)
 
 	draw.init_draw_state()
 
