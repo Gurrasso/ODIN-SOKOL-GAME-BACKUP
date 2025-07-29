@@ -1,5 +1,4 @@
 
-
 void update_lighting(){
 
 	for(int i = 0; i < lights_transform_data[0].w; i++){
@@ -14,6 +13,4 @@ void update_lighting(){
 
 	lit_col = mix_vec3((tex_col.rgb*world_brightness), tex_col.rgb, total_illumination);
 }
-
-
 

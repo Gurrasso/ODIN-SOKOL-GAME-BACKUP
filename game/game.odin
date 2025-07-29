@@ -332,12 +332,27 @@ update_player :: proc() {
 	if utils.get_vector_magnitude(player.move_dir) <= 0 do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.15)
 	else if gs.player.sprint.enabled do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
 	else do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
-
-
 	
+
 	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
 	transform.pos += motion
 
+	
+	//creates a player rotation based of the movement
+	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
+
+
+	player.last_move_dir = player.move_dir
+}
+
+draw_player :: proc(){
+	update_player_holder()
+	draw.update_animated_sprite(transform = gs.player.transform, id = gs.player.sprite_id)
+}
+
+update_player_holder :: proc(){
+	player := gs.player
+	transform := player.transform
 	//update the item holder of the player
 	holder := &player.holder
 
@@ -366,15 +381,6 @@ update_player :: proc() {
 	shoot_pos := player.holder.transform.pos + shoot_pos_offset
 	update_item_holder(holder^, holder_rotation_vector, shoot_pos)
 
-	//creates a player rotation based of the movement
-	transform.rot.z = to_degrees(math.atan2(player.look_dir.y, player.look_dir.x))
-
-
-	player.last_move_dir = player.move_dir
-}
-
-draw_player :: proc(){
-	draw.update_animated_sprite(transform = gs.player.transform, id = gs.player.sprite_id)
 }
 
 

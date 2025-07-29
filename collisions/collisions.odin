@@ -278,3 +278,7 @@ default_collider :: proc() -> Collider{
 	}
 }
 
+reload :: proc(){
+	clear(&colliders)
+}
+
