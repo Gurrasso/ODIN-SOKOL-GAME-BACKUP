@@ -414,7 +414,7 @@ append_text_object :: proc(
 	//init_rect(color = sg_color(color3 = Vec3{255, 255, 255}), text_center, {0.05, 0.05}, "center")
 }
 
-//initiate font and add it to the g.fonts
+//initiate font and add it to the g.fonts map with an id
 init_font :: proc(font_path: string, font_h: i32 = 16, id: string) {
 	using stbtt
 	

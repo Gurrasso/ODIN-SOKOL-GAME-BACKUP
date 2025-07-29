@@ -34,7 +34,7 @@ Collider :: struct{
 	type: Collider_type,
 	pos: ^Vec2,
 	rot: ^f32,
-	trigger_proc: proc(this_col: ^Collider, other_col: ^Collider),
+	trigger_proc: proc(this_col: ^Collider, other_col: ^Collider), //a proc that triggers on collision
 	hurt_proc: proc(damage: f32), // the other collider can trigger this in the trigger proc and the thing with this collider can say how to hurt it
 }
 
@@ -58,6 +58,7 @@ init_collider :: proc(
 	return collider_desc.id
 }
 
+//checks collision for every collider and resolves it
 update_colliders :: proc(){
 	//Loop through all colliders
 	for id, &col1 in colliders{
@@ -71,7 +72,13 @@ update_colliders :: proc(){
 	}
 }
 
-//resolves collisions using a minimum translation vector
+/*
+	resolves collisions using a minimum translation vector
+	
+	two dynamic colliders colliding will both move to resolve the collision
+	if one is dynamic and one is static, only the dynamic collider will move
+	if one or both is a trigger collider there will be no resolution since the trigger colliders arent rigid
+*/
 resolve_collision :: proc(col1: ^Collider, col2: ^Collider, mtv: Vec2){
 	// do the collider trigger proc
 	if col1.trigger_proc != nil do col1.trigger_proc(col1, col2)
@@ -248,11 +255,11 @@ check_verts_on_axis :: proc(verts1_min: f32, verts1_max: f32, verts2_min: f32, v
   } else do return false		//continue to check
 }
 
+//finds the min and max values for the vertecies on the axis
 project_polygon_to_axis :: proc(vertecies: [dynamic]Vec2, axis: Vec2) -> (min: f32, max: f32){
 	verts_min: f32 = linalg.vector_dot(axis, vertecies[0])
 	verts_max: f32 = min
 
-	//finds the min and max values for the vertecies on the axis
 	for vert in vertecies{
 		verts_min = linalg.min_double(verts_min, linalg.vector_dot(axis, vert))
 		verts_max = linalg.max_double(verts_max, linalg.vector_dot(axis, vert))
@@ -261,6 +268,7 @@ project_polygon_to_axis :: proc(vertecies: [dynamic]Vec2, axis: Vec2) -> (min: f
 	return verts_min, verts_max
 }
 
+//creates min and max values for a circle and an axis
 project_circle_to_axis :: proc(center: Vec2, radius: f32, axis: Vec2) -> (min: f32, max: f32){
 	vertecies: [dynamic]Vec2
 	
@@ -273,10 +281,12 @@ project_circle_to_axis :: proc(center: Vec2, radius: f32, axis: Vec2) -> (min: f
 	return verts_min, verts_max
 }
 
+//creates an axis from one vertex to another
 get_axis_vert_to_vert :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
 	return linalg.normalize0(vert1-vert2)
 }
 
+//creates an axis normal to the line created by to vertecies
 get_normal_axis :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
 	// get the perpendicular axis
   axis := Vec2{ 
@@ -288,6 +298,7 @@ get_normal_axis :: proc(vert1: Vec2, vert2: Vec2) -> Vec2{
 	return axis
 }
 
+//gives the vertecies for shapes in world space
 get_vertecies :: proc(col: Collider) -> [dynamic]Vec2{
 	vertecies: [dynamic]Vec2
 

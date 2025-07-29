@@ -60,7 +60,7 @@ init_game_state :: proc(){
 		text = "TÅST", 
 		draw_from_center = true, 
 		text_rot = test_text_rot, 
-		pos = {0, 1}, 
+		pos = {1, 1}, 
 		scale = 0.03, 
 		color = cu.sg_color(Vec3{138,43,226}), 
 		font_id = "font1"
