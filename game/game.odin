@@ -27,7 +27,7 @@ import "../sound"
 //game specific globals
 Game_state :: struct{
 	background_sprite: Sprite_id,
-	projectiles: [dynamic]Projectile,
+	projectiles: map[Projectile_id]Projectile,
 	enteties: Enteties,
 	player: Player,
 	cursor: Cursor,
@@ -42,6 +42,8 @@ test_text_id: string
 
 init_game_state :: proc(){
 	gs = new(Game_state)
+
+	init_background({130, 130, 130})
 
 	init_items()
 	sapp.show_mouse(false)
@@ -71,8 +73,6 @@ init_game_state :: proc(){
 	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 
-	init_background({130, 130, 130})
-
 	col.init_collider(col.Collider{
 		"",
 		true,
@@ -82,7 +82,8 @@ init_game_state :: proc(){
 		&test_rot,
 		nil,
 		nil,
-		""
+		"",
+		{}
 	})
 	col.init_collider(col.Collider{
 		"",
@@ -93,7 +94,8 @@ init_game_state :: proc(){
 		&test_rot,
 		nil,
 		nil,
-		""
+		"",
+		{}
 	})
 
 
@@ -108,7 +110,7 @@ test_vec21: Vec2 = {-4.9, 0}
 //this happens before the collision check
 update_game_state :: proc(){
 	
-	sound.play_continuously(name = "event:/Chill-theme", pos = {0, 0})
+	sound.play_continuously(name = "event:/Music", pos = {0, 0})
 
 	event_listener()
 
@@ -182,6 +184,7 @@ Player :: struct{
 	dash: Dash_data,
 	sprint: Sprint_data,
 
+	velocity: Vec2,
 	acceleration: f32,
 	deceleration: f32,
 	duration: f32,
@@ -208,8 +211,8 @@ init_player :: proc(){
 		move_dir = {1, 0},
 		default_move_speed = 4,
 		
-		acceleration = 16.2,
-		deceleration = 18,
+		acceleration = 7,
+		deceleration = 9,
 
 		holder = {
 			item = gs.enteties["empty"],
@@ -242,7 +245,8 @@ init_player :: proc(){
 		&gs.player.transform.rot.z,
 		nil,
 		nil,
-		""
+		"",
+		{}
 	})
 }
 
@@ -299,16 +303,25 @@ update_player :: proc() {
 		player.duration = math.clamp(player.duration, 0, 1)
 		//the speed becomes the desired speed times the acceleration easing curve based on the duration value of 0 to 1
 		player.current_move_speed = player.move_speed * player_acceleration_ease(gs.player.duration)
+
+
+		motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
 	} else {
 		player.move_dir = {0,0}
-		
 		//the duration decreses with the deceleration when not giving any input
 		player.duration -= player.deceleration * utils.dt
 		//the duration is still clamped between 0 and 1
 		player.duration = math.clamp(player.duration, 0, 1)
 		//the speed is set to the desired speed times the deceleration easing of the duration
 		player.current_move_speed = player.move_speed * player_deceleration_ease(player.duration)
+
+		motion = linalg.normalize0(player.velocity) * player.current_move_speed * utils.dt
 	}	
+
+
+	player.velocity = motion
+
+
 
 	//update sprites
 	if utils.get_vector_magnitude(player.move_dir) > 0 && utils.get_vector_magnitude(player.last_move_dir) <= 0 {
@@ -323,8 +336,7 @@ update_player :: proc() {
 	else if gs.player.sprint.enabled do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.07)
 	else do draw.update_animated_sprite_speed(gs.player.sprite_id, 0.1)
 
-	motion = linalg.normalize0(player.move_dir) * player.current_move_speed * utils.dt
-	transform.pos += motion
+	player.transform.pos += player.velocity
 
 	player.last_move_dir = player.move_dir
 }
@@ -363,8 +375,7 @@ update_player_holder :: proc(){
 	//where the bullet should come from if it is a gun
 	shoot_pos_offset := holder_rotation_vector * holder_item_data.size.x/2
 	shoot_pos := player.holder.transform.pos + shoot_pos_offset
-	update_item_holder(holder^, holder_rotation_vector, shoot_pos)
-
+	update_item_holder(holder, holder_rotation_vector, shoot_pos)
 }
 
 
@@ -411,18 +422,18 @@ init_player_dash :: proc(){
 	gs.player.dash = Dash_data{
 		enabled = false,
 		//distance that is going to be traveled by the player
-		dash_distance = 1.6,
+		dash_distance = 2.3,
 		//dash button
 		button = .SPACE,
 		//How fast it travels
-		dash_speed = 5,
+		dash_speed = 2.2,
 		//cutoff var for cutting off the ease function
-		cutoff = 0.96,
+		cutoff = 0.94,
 	}
 }
 
 dash_ease :: proc(x: f32) -> f32 {
-	ease := 1 - math.pow(1 - x, 3);
+	ease := 1 - math.pow(1 - x, 4);
 
 	return ease
 }

@@ -39,6 +39,12 @@ Collider :: struct{
 	trigger_proc: proc(this_col: ^Collider, other_col: ^Collider), //a proc that triggers on collision
 	hurt_proc: proc(damage: f32), // the other collider can trigger this in the trigger proc and the thing with this collider can say how to hurt it
 	scene: scenes.Scene_id,
+	data: Collider_data_dump,
+}
+
+Collider_data_dump :: struct{
+	projectile_id: string,
+	projectile_damage: f32,
 }
 
 Collider_id :: string
@@ -378,6 +384,7 @@ default_collider :: proc() -> Collider{
 		nil,
 		nil,
 		scenes.NIL_SCENE_ID,
+		{},
 	}
 }
 

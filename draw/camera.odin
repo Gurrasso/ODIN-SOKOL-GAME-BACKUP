@@ -282,7 +282,6 @@ screen_point_to_world_at_z :: proc(point: Vec2, target_z: f32) -> Vec3 {
 	//view matrix
 	view_matrix := linalg.matrix4_look_at_f32(camera.position, camera.target, {camera.rotation, 1, 0})
 
-
 	//Convert pixel to NDC
 	ndc_x := 2.0 * (point.x - viewport.x) / viewport.z - 1.0;
 	ndc_y := (2.0 * (point.y - viewport.y) / viewport.w - 1.0) * -1;

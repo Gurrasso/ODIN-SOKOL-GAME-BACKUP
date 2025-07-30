@@ -80,7 +80,7 @@ init_draw_state :: proc(){
 
 	g = new(Globals)
 
-	set_world_brightness(0.5)
+	set_world_brightness(1)
 
 	init_camera()
 

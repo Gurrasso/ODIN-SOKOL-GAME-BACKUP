@@ -6,12 +6,13 @@ import "core:math"
 import "core:math/linalg"
 import sapp "../../sokol/app"
 import sg "../../sokol/gfx"
+
 import "../utils"
 import "../draw"
 import cu "../utils/color"
 import "../events"
 import "../utils/cooldown"
-
+import col "../collisions"
 
 //COMPONENTS
 
@@ -31,8 +32,6 @@ update_item :: proc(transform: Transform, item_data: Item_data, sprite_id: strin
 
 //projectile weapon
 Projectile_weapon :: struct{
-	//id of the cooldown object that is linked to this weapon
-	cooldown_object: cooldown.Cooldown,
 	//cooldown of the weapon
 	cooldown: f32,
 	//shoot button
@@ -52,8 +51,8 @@ Projectile_weapon :: struct{
 }
 
 //init function that runs when the item holder inits with a projectile weapon or when a projectile weapon is given to an item holder
-init_projectile_weapon :: proc(weapon: ^Projectile_weapon){	
-	weapon.cooldown_object = cooldown.init_cooldown_object(weapon.cooldown)	
+init_projectile_weapon :: proc(weapon: ^Projectile_weapon, holder: ^Item_holder){	
+	holder.cooldown_object = cooldown.init_cooldown_object(weapon.cooldown)	
 }
 
 reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
@@ -61,16 +60,16 @@ reset_projectile_weapon :: proc(projectiles: ^Projectile_weapon){
 }
 
 //update function runs that runs every frame inside of item holder ( only if the item is equiped ofc )
-update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, shoot_pos: Vec2){
+update_projectile_weapon :: proc(weapon: ^Projectile_weapon, holder: ^Item_holder, shoot_dir: Vec2, shoot_pos: Vec2){
 	//add a projectile to the array if you press the right trigger
 	should_shoot: bool
 	
-	if cooldown.cooldown_enabled(weapon.cooldown_object) do should_shoot = false
+	if cooldown.cooldown_enabled(holder.cooldown_object) do should_shoot = false
 	else if !weapon.automatic do should_shoot = events.listen_mouse_single_down(weapon.trigger)
 	else do should_shoot = events.listen_mouse_down(weapon.trigger)
 
 	if should_shoot{
-		cooldown.start_cooldown(weapon.cooldown_object)
+		cooldown.start_cooldown(holder.cooldown_object)
 		for i in 0..< weapon.shots{
 						
 			sprite_id := utils.generate_string_id()
@@ -89,9 +88,11 @@ update_projectile_weapon :: proc(weapon: ^Projectile_weapon, shoot_dir: Vec2, sh
 	}
 }
 
+Projectile_id :: string
+
 //projectile
 Projectile :: struct{
-	index: int,
+	id: Projectile_id,
 	img: sg.Image,
 	lifetime: f32,
 	speed: f32,
@@ -101,16 +102,15 @@ Projectile :: struct{
 	sprite_id: draw.Sprite_id,
 	duration: f32,
 	dir: Vec2,
+	collider: col.Collider_id
 }
 
 update_projectiles :: proc(){
 	//update the projectiles and check if they should be removed
-	for i := 0; i < len(gs.projectiles); i+=1{
-		projectile := &gs.projectiles[i]
-		update_projectile(projectile)
+	for id, &projectile in gs.projectiles{
+		update_projectile(&projectile)
 		if projectile.duration > projectile.lifetime{
-			remove_projectile(projectile)
-			i-=1
+			remove_projectile(&projectile)
 		}
 	}
 }
@@ -129,31 +129,43 @@ init_projectile :: proc(
 	dir: Vec2, 
 	sprite_id: draw.Sprite_id
 ){
-	append(&gs.projectiles, projectile_data)
-	projectile := &gs.projectiles[len(gs.projectiles)-1]
+	id := sprite_id
+	gs.projectiles[id] = projectile_data
+	projectile := &gs.projectiles[id]
 	transform := &projectile.transform
 
-	projectile.index = len(gs.projectiles)-1
+	projectile.id = id
 
 	transform.pos = shoot_pos
 	projectile.dir = dir
 	transform.rot.z = linalg.to_degrees(linalg.atan2(projectile.dir.y, projectile.dir.x))
 	projectile.sprite_id = sprite_id
-	
+
 	draw.init_sprite(img = projectile.img, transform = transform^, id = projectile.sprite_id)
+
+	projectile.collider = col.init_collider(col.Collider{
+		"",
+		true,
+		col.Rect_collider_shape{transform.size},
+		.Dynamic,
+		&projectile.transform.pos,
+		&projectile.transform.rot.z,
+		proc(this_col: ^col.Collider, other_col: ^col.Collider){
+			if other_col.data.projectile_id == "" do remove_projectile(&gs.projectiles[this_col.data.projectile_id])
+			if other_col.hurt_proc != nil do other_col.hurt_proc(this_col.data.projectile_damage)
+		},
+		nil,
+		"",
+		col.Collider_data_dump{projectile.id, projectile.damage}
+	})
 }
 
 remove_projectile :: proc(projectile: ^Projectile){
 	//remove the projectile sprite
 	draw.remove_object(projectile.sprite_id)
+	col.remove_collider(projectile.collider)
 
-	index := projectile.index
-	ordered_remove(&gs.projectiles, index)
-
-	//change the index field of the other projectiles
-	for i in index..<len(gs.projectiles){
-		gs.projectiles[i].index -= 1
-	}
+	delete_key(&gs.projectiles, projectile.id)
 }
 
 
@@ -167,6 +179,8 @@ Item_holder :: struct{
 	sprite_id: Sprite_id,
 	//if items like guns should be equipped
 	equipped: bool,
+	//id of the cooldown object that is linked to the item
+	cooldown_object: cooldown.Cooldown,
 }
 
 //init an item holder and check for certain tags
@@ -179,7 +193,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 	case .Projectile_weapon:
 		if holder.equipped{
 			pweapon := entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
-			init_projectile_weapon(pweapon)
+			init_projectile_weapon(pweapon, holder)
 		}
 	}
 
@@ -190,7 +204,7 @@ init_item_holder :: proc(holder: ^Item_holder){
 
 //update the item holder and check for certain tags
 update_item_holder :: proc(
-	holder: Item_holder, 
+	holder: ^Item_holder, 
 	look_dir: Vec2 = {1, 0}, 
 	shoot_pos: Vec2 = {0, 0}
 ){
@@ -200,7 +214,7 @@ update_item_holder :: proc(
 	case .Projectile_weapon:
 		if holder.equipped{
 			pweapon := entity_get_component(entity = item.entity, component_type = Projectile_weapon) 
-			update_projectile_weapon(pweapon, look_dir, shoot_pos)
+			update_projectile_weapon(pweapon, holder, look_dir, shoot_pos)
 		}		
 	}
 
