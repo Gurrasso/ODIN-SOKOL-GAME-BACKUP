@@ -177,10 +177,12 @@ init_cb :: proc "c" (){
 		game.init_game_state,
 		game.update_game_state,
 		game.draw_game_state,
+		nil,
 	)
 
 	scenes.create_scene(
 		"menu",
+		nil,
 		nil,
 		nil,
 		nil,
