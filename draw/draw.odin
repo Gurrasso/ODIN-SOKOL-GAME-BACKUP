@@ -13,6 +13,7 @@ import stbtt "vendor:stb/truetype"
 
 import "../utils"
 import cu "../utils/color"
+import "../scenes"
 
 
 Transform :: utils.Transform
@@ -28,6 +29,7 @@ Sprite_object :: struct{
 	vertex_buffer: sg.Buffer,
 	size: Vec2,
 	draw: bool,
+	scene: scenes.Scene_id,
 }
 
 Sprite_object_group :: struct{
@@ -50,9 +52,10 @@ init_rect :: proc(
 	transform: Transform = DEFAULT_TRANSFORM, 
 	id: Sprite_id = Null_sprite_id, tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default,
-	draw: bool = true
+	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID,
 ) -> string{
-	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color, draw)	
+	return init_sprite_from_img(WHITE_IMAGE, transform, id, tex_index, draw_priority, color, draw, scene)	
 }
 
 
@@ -68,7 +71,8 @@ init_sprite_from_img :: proc(
 	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default, 
 	color_offset: sg.Color = { 1,1,1,1 },
-	draw: bool = true
+	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID,
 ) -> string{
 
 	DEFAULT_UV :: Vec4 { 0,0,1,1 }
@@ -82,6 +86,10 @@ init_sprite_from_img :: proc(
 
 	object_group := &g.sprite_objects[id]
 
+
+	scene := scene
+	if scene == scenes.NIL_SCENE_ID do scene = scenes.get_current_scene()   
+
 	append(&object_group.objects, Sprite_object{
 		utils.vec2_to_vec3(transform.pos),
 		transform.rot,
@@ -90,6 +98,7 @@ init_sprite_from_img :: proc(
 		buffer,
 		transform.size,
 		draw,
+		scene,
 	})
 
 	return id
@@ -104,9 +113,10 @@ init_sprite_from_filename :: proc(
 	tex_index: Tex_indices = .default, 
 	draw_priority: Draw_layers = .default,
 	color_offset: sg.Color = { 1,1,1,1 },
-	draw: bool = true
+	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID,
 ) -> string{
-	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority, color_offset, draw)	
+	return init_sprite_from_img(get_image(filename), transform, id, tex_index, draw_priority, color_offset, draw, scene)	
 }
 
 //involves some code duplication
@@ -129,6 +139,7 @@ update_sprite_transform_image :: proc(img: sg.Image, transform: Transform, id: S
 			object.vertex_buffer,
 			object.size,
 			object.draw,
+			object.scene
 		}
 	}
 }
@@ -146,6 +157,7 @@ update_sprite_image :: proc(img: sg.Image, id: Sprite_id){
 			object.vertex_buffer,
 			object.size,
 			object.draw,
+			object.scene
 		}
 	}
 }
@@ -164,6 +176,7 @@ update_sprite_transform :: proc(transform: Transform, id: Sprite_id){
 			object.vertex_buffer,
 			object.size,
 			object.draw,
+			object.scene
 		}
 	}
 }
@@ -252,6 +265,7 @@ Text_object :: struct{
 	rot: Vec3,
 	draw_priority: i32,
 	draw: bool,
+	scene: scenes.Scene_id
 }
 
 FONT_INFO :: struct {
@@ -277,7 +291,8 @@ init_text :: proc(
 	text_rot : f32 = 0, 
 	draw_priority: Draw_layers = .text, 
 	draw_from_center: bool = false,
-	draw: bool = true
+	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID
 ) -> Sprite_id{
 	using stbtt
 
@@ -356,9 +371,10 @@ init_text :: proc(
 		text_object_id, pos, 
 		auto_cast draw_priority, 
 		draw_from_center,
-		draw
+		draw,
+		scene,
 	)
-	
+
 	return text_object_id
 }
 
@@ -369,7 +385,8 @@ append_text_object :: proc(
 	text_pos: Vec2, 
 	draw_priority: i32, 
 	draw_from_center: bool,
-	draw: bool
+	draw: bool,
+	scene: scenes.Scene_id
 ){
 	text_center : Vec2
 	text_rot : Vec3 = rot
@@ -400,6 +417,9 @@ append_text_object :: proc(
 			obj.rotation_pos_offset = utils.vec2_rotation(Vec2{obj.pos.x, obj.pos.y}, text_center, obj.rot.z)
 		}
 	}
+
+	scene := scene
+	if scene == scenes.NIL_SCENE_ID do scene = scenes.get_current_scene() 
 	
 	//add the text objects to the text objects
 	g.text_objects[text_object_id] = Text_object{
@@ -408,6 +428,7 @@ append_text_object :: proc(
 		text_rot,
 		draw_priority,
 		draw,
+		scene,
 	}
 
 	//show the center point of the text

@@ -71,27 +71,29 @@ init_game_state :: proc(){
 	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 	draw.init_rect(color = cu.sg_color(Vec4{255, 20, 20, 120}), transform = Transform{pos = {-4.9, 0}, size = {.2, 4.8}, rot = {0, 0, 0}}, draw_priority = .environment)
 
-	init_cursor()
-
 	init_background({130, 130, 130})
 
 	col.init_collider(col.Collider{
 		"",
+		true,
 		col.Rect_collider_shape{{10, .2}},
 		.Static,
 		&test_vec2,
 		&test_rot,
 		nil,
-		nil
+		nil,
+		""
 	})
 	col.init_collider(col.Collider{
 		"",
+		true,
 		col.Rect_collider_shape{{.2, 4.8}},
 		.Static,
 		&test_vec21,
 		&test_rot,
 		nil,
-		nil
+		nil,
+		""
 	})
 
 
@@ -106,7 +108,7 @@ test_vec21: Vec2 = {-4.9, 0}
 //this happens before the collision check
 update_game_state :: proc(){
 	
-	sound.play_continuously(name = "event:/Forest-theme", pos = {0, 0})
+	sound.play_continuously(name = "event:/Chill-theme", pos = {0, 0})
 
 	event_listener()
 
@@ -124,13 +126,9 @@ draw_game_state :: proc(){
 
 	update_camera()
 
-	update_cursor()
-
 	update_background()
 
 	draw_player()
-
-	ev.mouse_move = {}
 }
 
 //updates every x seconds
@@ -148,15 +146,7 @@ tempiteminc: int
 
 // all the event based checks (eg keyboard inputs)
 event_listener :: proc(){
-	//Exit program if you hit escape
-	if ev.listen_key_down(.ESCAPE) {
-		quit_game()
-	}
-
-	//fullscreen on F11
-	if ev.listen_key_single_down(.F11) {
-		sapp.toggle_fullscreen()
-	}
+	
 
 	if ev.listen_key_single_down(.F){
 		if tempiteminc %% 2 == 0{
@@ -168,7 +158,6 @@ event_listener :: proc(){
 		}
 	}
 
-	if !sapp.mouse_locked() && ev.listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
 }
 
 // PLAYER
@@ -246,12 +235,14 @@ init_player :: proc(){
 
 	col.init_collider(col.Collider{
 		"",
+		true,
 		col.Rect_collider_shape{gs.player.transform.size},
 		.Dynamic,
 		&gs.player.transform.pos,
 		&gs.player.transform.rot.z,
 		nil,
-		nil
+		nil,
+		""
 	})
 }
 

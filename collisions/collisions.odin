@@ -7,6 +7,7 @@ import "core:math"
 import "core:math/linalg"
 
 import "../utils/"
+import "../scenes"
 
 // the union allows for defining multible different shapes containing different data
 Collider_shape :: union #no_nil{
@@ -30,12 +31,14 @@ Collider_type :: enum{
 
 Collider :: struct{
 	id: Collider_id,				//this is so the collider can find itself in the colliders map
+	enabled: bool, 
 	shape: Collider_shape,
 	type: Collider_type,
 	pos: ^Vec2,
 	rot: ^f32,
 	trigger_proc: proc(this_col: ^Collider, other_col: ^Collider), //a proc that triggers on collision
 	hurt_proc: proc(damage: f32), // the other collider can trigger this in the trigger proc and the thing with this collider can say how to hurt it
+	scene: scenes.Scene_id,
 }
 
 Collider_id :: string
@@ -44,9 +47,11 @@ colliders: map[Collider_id]Collider
 
 //creates a collider by passing a Collider struct
 init_collider :: proc(
-	collider_desc: Collider
+	collider_desc: Collider,
 ) -> Collider_id{
 	collider_desc := collider_desc
+
+	if collider_desc.scene == scenes.NIL_SCENE_ID do collider_desc.scene = scenes.get_current_scene() 
 
 	//generates a random id if the id given is the default
 	collider_desc.id = collider_desc.id == default_collider().id ? utils.generate_string_id() : collider_desc.id
@@ -62,8 +67,9 @@ init_collider :: proc(
 update_colliders :: proc(){
 	//Loop through all colliders
 	for id, &col1 in colliders{
+		if !col1.enabled || !scenes.scene_enabled(col1.scene) do continue
 		for id, &col2 in colliders{
-			if col1 == col2 do continue
+			if col1 == col2 || !col2.enabled || !scenes.scene_enabled(col1.scene) do continue
 
 			colliding, mtv := check_collision(col1, col2)
 			if colliding do resolve_collision(&col1, &col2, mtv)
@@ -335,6 +341,12 @@ get_vertecies :: proc(col: Collider) -> [dynamic]Vec2{
 	return vertecies
 }
 
+toggle_enabled :: proc(id: Collider_id){
+	assert(id in colliders)
+	collider := &colliders[id]
+	collider.enabled = !collider.enabled
+}
+
 remove_collider :: proc(id: Collider_id){
 	assert(id in colliders)
 	delete_key(&colliders, id)
@@ -358,12 +370,14 @@ drot: f32 = 0
 default_collider :: proc() -> Collider{
 	return Collider{
 		"",
+		true,
 		default_collider_shape(),
 		.Static,
 		&dpos,
 		&drot,
 		nil,
 		nil,
+		scenes.NIL_SCENE_ID,
 	}
 }
 

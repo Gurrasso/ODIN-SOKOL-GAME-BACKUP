@@ -102,6 +102,7 @@ import "events"
 import "utils/cooldown"
 import "collisions"
 import "sound"
+import "scenes"
 
 Spring :: struct{
 	//where the spring is attached
@@ -154,8 +155,6 @@ main :: proc(){
 init_cb :: proc "c" (){
 	context = default_context
 	
-	
-
 	//init_icon("./src/assets/sprites/ase256.png")
 
 	//setup for the sokol graphics
@@ -173,7 +172,24 @@ init_cb :: proc "c" (){
 
 	draw.init_draw_state()
 
-	game.init_game_state()
+	scenes.create_scene(
+		"game",
+		game.init_game_state,
+		game.update_game_state,
+		game.draw_game_state,
+	)
+
+	scenes.create_scene(
+		"menu",
+		nil,
+		nil,
+		nil,
+	)
+
+	scenes.switch_scene("game")
+
+	game.init_cursor()
+	
 }
 
 
@@ -220,11 +236,16 @@ frame_cb :: proc "c" (){
 		time_since_fixed_update = 0
 	}
 
-	game.update_game_state()
+	scenes.scene_update()
 
 	collisions.update_colliders()
 
-	game.draw_game_state()
+	scenes.scene_draw()
+
+	game.update_cursor()
+
+	if events.listen_key_single_down(.M) do scenes.switch_scene("menu")
+	if events.listen_key_single_down(.K) do scenes.switch_scene("game")
 	
 	if events.listen_screen_resized() do events.screen_resized = false
 
@@ -233,6 +254,8 @@ frame_cb :: proc "c" (){
 	//update sound and make the listener pos the player 
 	sound.update(game.gs.player.transform.pos)
 	sound.update_sound_emitters()
+
+	events.mouse_move = {}
 }
 
 //Events

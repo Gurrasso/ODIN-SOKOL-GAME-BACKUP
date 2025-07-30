@@ -7,6 +7,7 @@ import sg "../../sokol/gfx"
 
 import "../utils"
 import cooldown "../utils/cooldown"
+import "../scenes"
 
 // ===================
 //  :ANIMATED SPRITES
@@ -25,6 +26,7 @@ Animated_sprite_object :: struct{
 	animation_speed: f32,
 	animation_enabled: bool,
 	draw: bool,
+	scene: scenes.Scene_id,
 }
 
 delete_animated_sprite :: proc(id: Sprite_id){
@@ -95,6 +97,7 @@ init_animated_sprite_from_img :: proc(
 	animation_speed: f32 = 0.1,
 	sprite_count: uint = 1,
 	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID,
 ) -> string{
 
 	// set the uv to only show the first frame
@@ -109,6 +112,9 @@ init_animated_sprite_from_img :: proc(
 
 	object_group := &g.sprite_objects[id]
 
+	scene := scene
+	if scene == scenes.NIL_SCENE_ID do scene = scenes.get_current_scene() 
+
 	g.animated_sprite_objects[id] = Animated_sprite_object{
 		utils.vec2_to_vec3(transform.pos),
 		transform.rot,
@@ -121,6 +127,7 @@ init_animated_sprite_from_img :: proc(
 		animation_speed,
 		false,
 		draw,
+		scene
 	}
 
 	return id
@@ -136,8 +143,9 @@ init_animated_sprite_from_filename :: proc(
 	animation_speed: f32 = 0.1,
 	sprite_count: uint = 1,
 	draw: bool = true,
+	scene: scenes.Scene_id = scenes.NIL_SCENE_ID
 ) -> string{
-	return init_animated_sprite_from_img(load_image(sprite_sheet_filename), transform, id, tex_index, draw_priority, color_offset, animation_speed, sprite_count, draw)
+	return init_animated_sprite_from_img(load_image(sprite_sheet_filename), transform, id, tex_index, draw_priority, color_offset, animation_speed, sprite_count, draw, scene)
 }
 
 // updates all the sprites to go to the next frame in the animation after a certain amount of time

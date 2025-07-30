@@ -43,6 +43,18 @@ update_events :: proc(ev: ^sapp.Event){
 		case .RESIZED:
 			screen_resized = true
 	}
+
+	//Exit program if you hit escape
+	if listen_key_down(.ESCAPE) {
+		sapp.quit()
+	}
+
+	//fullscreen on F11
+	if listen_key_single_down(.F11) {
+		sapp.toggle_fullscreen()
+	}
+
+	if !sapp.mouse_locked() && listen_mouse_single_down(.LEFT) do sapp.lock_mouse(true)
 }
 
 // EVENT UTILS (dont really need all of these procs but it makes it a bit more intuitive)

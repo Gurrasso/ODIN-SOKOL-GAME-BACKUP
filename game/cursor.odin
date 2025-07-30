@@ -3,6 +3,7 @@ package game
 import "../utils"
 import "../draw"
 import "../events"
+import "../scenes"
 
 // CURSOR
 
@@ -39,6 +40,7 @@ init_cursor :: proc(){
 		transform = gs.cursor.transform,
 		draw_priority = .cursor,
 		tex_index = .no_lighting,
+		scene = scenes.GLOBAL_SCENE_ID,
 	)
 }
 
