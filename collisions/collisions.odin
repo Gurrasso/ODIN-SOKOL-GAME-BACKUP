@@ -32,6 +32,7 @@ Collider_type :: enum{
 Collider :: struct{
 	id: Collider_id,				//this is so the collider can find itself in the colliders map
 	enabled: bool, 
+	should_delete: bool,
 	shape: Collider_shape,
 	type: Collider_type,
 	pos: ^Vec2,
@@ -74,8 +75,17 @@ update_colliders :: proc(){
 	//Loop through all colliders
 	for id, &col1 in colliders{
 		if !col1.enabled || !scenes.scene_enabled(col1.scene) do continue
+		if col1.should_delete {
+			delete_key(&colliders, id)
+			continue
+		}
+
 		for id, &col2 in colliders{
 			if col1 == col2 || !col2.enabled || !scenes.scene_enabled(col1.scene) do continue
+			if col2.should_delete {
+				delete_key(&colliders, id)
+				continue
+			}
 
 			colliding, mtv := check_collision(col1, col2)
 			if colliding do resolve_collision(&col1, &col2, mtv)
@@ -355,7 +365,8 @@ toggle_enabled :: proc(id: Collider_id){
 
 remove_collider :: proc(id: Collider_id){
 	assert(id in colliders)
-	delete_key(&colliders, id)
+	collider := &colliders[id]
+	collider.should_delete = true
 }
 
 query_collider :: proc(id: Collider_id) -> Collider{
@@ -377,6 +388,7 @@ default_collider :: proc() -> Collider{
 	return Collider{
 		"",
 		true,
+		false,
 		default_collider_shape(),
 		.Static,
 		&dpos,

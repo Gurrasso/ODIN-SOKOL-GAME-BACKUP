@@ -12,7 +12,7 @@ import "game"
 import "collisions"
 
 check_reloads :: proc(){
-	if events.listen_key_single_down(.C) do reset_game_state()
+	//if events.listen_key_single_down(.C) do reset_game_state()
 }
 
 reset_game_state :: proc(){

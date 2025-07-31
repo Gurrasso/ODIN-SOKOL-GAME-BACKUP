@@ -146,13 +146,14 @@ init_projectile :: proc(
 	projectile.collider = col.init_collider(col.Collider{
 		"",
 		true,
+		false,
 		col.Rect_collider_shape{transform.size},
 		.Dynamic,
 		&projectile.transform.pos,
 		&projectile.transform.rot.z,
 		proc(this_col: ^col.Collider, other_col: ^col.Collider){
-			if other_col.data.projectile_id == "" do remove_projectile(&gs.projectiles[this_col.data.projectile_id])
 			if other_col.hurt_proc != nil do other_col.hurt_proc(this_col.data.projectile_damage)
+			if other_col.data.projectile_id == "" do remove_projectile(&gs.projectiles[this_col.data.projectile_id])
 		},
 		nil,
 		"",
@@ -161,6 +162,7 @@ init_projectile :: proc(
 }
 
 remove_projectile :: proc(projectile: ^Projectile){
+	if projectile == nil do return
 	//remove the projectile sprite
 	draw.remove_object(projectile.sprite_id)
 	col.remove_collider(projectile.collider)

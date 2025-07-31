@@ -4,6 +4,8 @@ package main
 /*
 	TODO: 
 
+	i think something is causing the projectiles to sometimes get removed but the collider still triggers the remove proc for them, causes seg fault, fixed with a hack should fix in a better way,
+
 	fmod splash screen,
 	make fmod shared objects not have to be exported every build and maybe not have to be included with the bin?,
 
@@ -201,8 +203,6 @@ cleanup_cb :: proc "c" (){
 	context = default_context
 	
 	draw.draw_cleanup()
-
-	free_all()
 
 	//shut down sokol graphics
 	sg.shutdown()

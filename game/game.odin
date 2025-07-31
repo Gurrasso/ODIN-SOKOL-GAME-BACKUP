@@ -76,6 +76,7 @@ init_game_state :: proc(){
 	col.init_collider(col.Collider{
 		"",
 		true,
+		false,
 		col.Rect_collider_shape{{10, .2}},
 		.Static,
 		&test_vec2,
@@ -88,6 +89,7 @@ init_game_state :: proc(){
 	col.init_collider(col.Collider{
 		"",
 		true,
+		false,
 		col.Rect_collider_shape{{.2, 4.8}},
 		.Static,
 		&test_vec21,
@@ -201,7 +203,7 @@ init_player :: proc(){
 		running_sprite_filename = "./src/assets/sprite_sheets/running_template_character.png",
 		
 		transform = {
-			size = { 0.7,0.96 }
+			size = draw.get_sprite_sheet_size("./src/assets/sprite_sheets/idle_template_character.png", 8)
 		},
 		//used for flipping the player sprite in the x dir, kinda temporary(should replace later)
 		xflip = -1,
@@ -215,7 +217,7 @@ init_player :: proc(){
 		deceleration = 9,
 
 		holder = {
-			item = gs.enteties["empty"],
+			item = gs.enteties["arvid"],
 			equipped = true,
 		},
 		
@@ -239,6 +241,7 @@ init_player :: proc(){
 	col.init_collider(col.Collider{
 		"",
 		true,
+		false,
 		col.Rect_collider_shape{gs.player.transform.size},
 		.Dynamic,
 		&gs.player.transform.pos,
@@ -537,6 +540,7 @@ init_weapons :: proc(){
 		random_spread = 0.3,
 		shots = 5,
 		cooldown = 0.5,
+		automatic = true,
 		spread = 0.12,
 		camera_shake = 1.6,
 		projectile = Projectile{
