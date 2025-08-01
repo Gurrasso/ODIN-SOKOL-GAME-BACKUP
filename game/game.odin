@@ -52,7 +52,7 @@ init_game_state :: proc(){
 
 	init_player()
 
-	draw.set_world_brightness(0.4)
+	draw.set_world_brightness(.4)
 
 	draw.init_light(pos = {1, 3}, size = 6, intensity = 1, color = {1, 1, 1, 1})
 	draw.init_light(pos = {2, -2}, size = 3.5, intensity = 1, color = {1, 1, 1, 1})
@@ -100,22 +100,6 @@ init_game_state :: proc(){
 		"",
 		{}
 	})
-	
-	ui.init_button(button_desc = ui.Button{
-		Transform{
-			size = {.05,.05},
-			pos = {.05,.1},
-			rot = 0,
-		},
-		{},
-		WHITE_IMAGE_PATH,
-		"",
-		"",
-		proc(){
-			log.debug("BUTTON HIT")
-		}
-	})
-
 }
 
 test_vec2: Vec2 = {0, 2.5}
@@ -126,7 +110,7 @@ test_vec21: Vec2 = {-4.9, 0}
 //this happens before the collision check
 update_game_state :: proc(){
 	
-	sound.play_continuously(name = "event:/Music", pos = {0, 0})
+	sound.play_continuously(name = "event:/Music")
 
 	event_listener()
 
@@ -143,8 +127,6 @@ update_game_state :: proc(){
 draw_game_state :: proc(){
 
 	update_camera()
-
-	update_background()
 
 	draw_player()
 }

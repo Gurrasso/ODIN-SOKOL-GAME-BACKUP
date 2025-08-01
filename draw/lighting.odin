@@ -69,7 +69,7 @@ generate_lighting_uniforms_data :: proc() -> ([LIGHTS_DATA_SIZE]Vec4, [LIGHTS_DA
 
 // sets the brightness, 0.5 is bright 0 is completely dark
 set_world_brightness :: proc(brightness: f32){
-	g.world_brightness = brightness
+	g.world_brightness = clamp(brightness, 0, 1)
 }
 
 toggle_light :: proc(id: Light_id){

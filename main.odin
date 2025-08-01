@@ -172,7 +172,7 @@ init_cb :: proc "c" (){
 
 	WHITE_IMAGE = draw.WHITE_IMAGE
 
-	sound.init(1)
+	sound.init(.1)
 
 	draw.init_draw_state()
 
@@ -185,14 +185,15 @@ init_cb :: proc "c" (){
 	)
 
 	scenes.create_scene(
-		"menu",
-		nil,
-		nil,
+		"main_menu",
+		game.init_main_menu,
+		game.update_main_menu,
 		nil,
 		nil,
 	)
 
 	scenes.switch_scene("game")
+	scenes.switch_scene("main_menu")
 
 	game.init_cursor()
 	
@@ -246,11 +247,12 @@ frame_cb :: proc "c" (){
 
 	scenes.scene_draw()
 
+	game.update_background()
 	game.update_cursor()
 
 	ui.update()
 
-	if events.listen_key_single_down(.M) do scenes.switch_scene("menu")
+	if events.listen_key_single_down(.M) do scenes.switch_scene("main_menu")
 	if events.listen_key_single_down(.K) do scenes.switch_scene("game")
 	
 	if events.listen_screen_resized() do events.screen_resized = false

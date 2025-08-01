@@ -196,7 +196,7 @@ stop_animation :: proc(id: Sprite_id){
 	assert(id in g.animated_sprite_objects)
 
 	obj := &g.animated_sprite_objects[id]
-	update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
+	//update_vertex_buffer_uv(obj.vertex_buffer, {0, 0, 1 / auto_cast obj.sprite_count, 1})
 	obj.animation_enabled = false
 }
 
