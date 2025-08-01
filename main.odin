@@ -105,6 +105,7 @@ import "utils/cooldown"
 import "collisions"
 import "sound"
 import "scenes"
+import "ui"
 
 Spring :: struct{
 	//where the spring is attached

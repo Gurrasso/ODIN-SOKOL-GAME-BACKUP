@@ -55,7 +55,7 @@ main :: proc() {
 	{
 		c: [dynamic]string = {
 			"odin",
-			"build",
+			"run",
 			"src",
 			fmt.tprintf("-out:%v/%v.%v", out_dir, EXE_NAME, suffix),
 		}
@@ -94,7 +94,6 @@ main :: proc() {
 	}
 
 	fmt.println("DONE in", time.diff(start_time, time.now()))
-	utils.fire(fmt.tprintf("%v/%v.%v", out_dir, EXE_NAME, suffix))
 }
 
 

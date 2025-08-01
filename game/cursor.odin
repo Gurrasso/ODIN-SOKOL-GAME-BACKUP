@@ -1,9 +1,12 @@
 package game
 
+import "core:log"
+
 import "../utils"
 import "../draw"
 import "../events"
 import "../scenes"
+import col "../collisions"
 
 // CURSOR
 
@@ -15,6 +18,7 @@ Cursor :: struct{
 	lookahead_distance: f32,
 	lookahead: f32,
 	sprite_id: Sprite_id,
+	collider: col.Collider_id,
 }
 
 init_cursor :: proc(){
@@ -32,6 +36,22 @@ init_cursor :: proc(){
 		//divides the lookahead distance to get the actual lookahead of the camera
 		lookahead = 13,
 	}
+
+	gs.cursor.collider = col.init_collider(
+		col.Collider{
+			"",
+			true,
+			false,
+			col.Rect_collider_shape{gs.cursor.world_transform.size},
+			.Trigger,
+			&gs.cursor.world_transform.pos,
+			&gs.cursor.world_transform.rot.z,
+			nil,
+			nil,
+			"",
+			{is_cursor = true}
+		}
+	)
 
 	gs.cursor.transform.size = draw.get_pixel_size_in_world(gs.cursor.transform.size, 0)
 
@@ -52,6 +72,7 @@ update_cursor :: proc(){
 		size = gs.cursor.transform.size,
 		rot = gs.cursor.transform.rot,
 	}
+
 	if events.listen_screen_resized() do draw.update_sprite_size(size = gs.cursor.world_transform.size, id = gs.cursor.sprite_id)
 	draw.update_sprite(transform = gs.cursor.world_transform, id = gs.cursor.sprite_id)
 }

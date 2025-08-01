@@ -29,7 +29,7 @@ Animated_sprite_object :: struct{
 	scene: scenes.Scene_id,
 }
 
-delete_animated_sprite :: proc(id: Sprite_id){
+remove_animated_sprite :: proc(id: Sprite_id){
 	assert(id in g.animated_sprite_objects)
 
 	delete_key(&g.animated_sprite_objects, id)

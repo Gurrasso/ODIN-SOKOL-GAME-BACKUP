@@ -46,6 +46,8 @@ Collider :: struct{
 Collider_data_dump :: struct{
 	projectile_id: string,
 	projectile_damage: f32,
+	is_cursor: bool,
+	button_trigger_proc: proc(),
 }
 
 Collider_id :: string
@@ -143,8 +145,7 @@ resolve_collision :: proc(col1: ^Collider, col2: ^Collider, mtv: Vec2){
 
 //returns true if they are colliding and returns a vector to resolve the collision
 check_collision :: proc(col1: Collider, col2: Collider) -> (bool, Vec2){
-	//only dynamic colliders move and collide with things can actually collide with things
-	if col1.type != .Dynamic && col2.type != .Dynamic do return false, {0, 0}
+	if col1.type == .Static && col2.type == .Static do return false,{0,0}
 
 	_, col1_circle := col1.shape.(Circle_collider_shape)
 	_, col2_circle := col2.shape.(Circle_collider_shape) 

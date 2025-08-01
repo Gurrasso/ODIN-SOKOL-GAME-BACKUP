@@ -19,6 +19,7 @@ import cu "../utils/color"
 import ev "../events"
 import col "../collisions"
 import "../sound"
+import "../ui"
 
 // ==============
 //     :GAME
@@ -99,8 +100,20 @@ init_game_state :: proc(){
 		"",
 		{}
 	})
-
-
+	
+	ui.init_button(button_desc = ui.Button{
+		Transform{
+			size = {1,1},
+			pos = {0,-1},
+			rot = 0,
+		},
+		WHITE_IMAGE_PATH,
+		"",
+		"",
+		proc(){
+			log.debug("BUTTON HIT")
+		}
+	})
 
 }
 

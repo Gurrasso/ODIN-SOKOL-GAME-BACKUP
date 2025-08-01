@@ -130,6 +130,7 @@ init_projectile :: proc(
 	sprite_id: draw.Sprite_id
 ){
 	id := sprite_id
+	assert(!(id in gs.projectiles))
 	gs.projectiles[id] = projectile_data
 	projectile := &gs.projectiles[id]
 	transform := &projectile.transform
@@ -148,16 +149,17 @@ init_projectile :: proc(
 		true,
 		false,
 		col.Rect_collider_shape{transform.size},
-		.Dynamic,
+		.Trigger,
 		&projectile.transform.pos,
 		&projectile.transform.rot.z,
 		proc(this_col: ^col.Collider, other_col: ^col.Collider){
+			if other_col.type == .Trigger do return
 			if other_col.hurt_proc != nil do other_col.hurt_proc(this_col.data.projectile_damage)
 			if other_col.data.projectile_id == "" do remove_projectile(&gs.projectiles[this_col.data.projectile_id])
 		},
 		nil,
 		"",
-		col.Collider_data_dump{projectile.id, projectile.damage}
+		col.Collider_data_dump{projectile_id = projectile.id, projectile_damage = projectile.damage}
 	})
 }
 

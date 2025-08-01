@@ -234,8 +234,9 @@ Draw_layers :: enum i32{
 	item = 3,
 	default = 4,
 	text = 5,
-	cursor = 6,
-	top = 7,
+	ui = 6,
+	cursor = 7,
+	top = 8,
 }
 
 // TEX_INDICES

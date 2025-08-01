@@ -45,7 +45,7 @@ init_light :: proc(
 	return id
 }
 
-delete_light :: proc(id: Light_id){
+remove_light :: proc(id: Light_id){
 	assert(id in g.lights)
 	delete_key(&g.lights, id)
 }
