@@ -28,8 +28,8 @@ main :: proc() {
 
 	// generate the shader
 	// docs: https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md
-	when ODIN_OS == .Windows do utils.fire("src/tools/windows/sokol-shdc.exe", "-i", "src/shaders/shader.glsl", "-o", "src/user/generated_shader.odin", "-l", "hlsl5", "-f", "sokol_odin")
-	when ODIN_OS == .Linux do utils.fire("src/tools/linux/sokol-shdc", "-i", "src/shaders/shader.glsl", "-o", "src/user/generated_shader.odin", "-l", "glsl5", "-f", "sokol_odin")
+	when ODIN_OS == .Windows do utils.fire("src/build/tools/windows/sokol-shdc.exe", "-i", "src/shaders/shader.glsl", "-o", "src/user/generated_shader.odin", "-l", "hlsl5", "-f", "sokol_odin")
+	when ODIN_OS == .Linux do utils.fire("src/build/tools/linux/sokol-shdc", "-i", "src/shaders/shader.glsl", "-o", "src/user/generated_shader.odin", "-l", "glsl410", "-f", "sokol_odin")
 
 	wd := os.get_current_directory()
 
@@ -77,10 +77,10 @@ main :: proc() {
 			append(&files_to_copy, "src/lib/fmod/core/lib/windows/x64/fmodL.dll")
 
 			case .Linux:
-			append(&files_to_copy, "src/lib/fmod/studio/lib/linux/x86_64/libfmodstudio.so")
-			append(&files_to_copy, "src/lib/fmod/studio/lib/linux/x86_64/libfmodstudioL.so")
-			append(&files_to_copy, "src/lib/fmod/core/lib/linux/x86_64/libfmod.so")
-			append(&files_to_copy, "src/lib/fmod/core/lib/linux/x86_64/libfmodL.so")
+			append(&files_to_copy, "src/lib/fmod/studio/lib/linux/x86_64/libfmodstudio.so.13")
+			append(&files_to_copy, "src/lib/fmod/studio/lib/linux/x86_64/libfmodstudioL.so.13")
+			append(&files_to_copy, "src/lib/fmod/core/lib/linux/x86_64/libfmod.so.13")
+			append(&files_to_copy, "src/lib/fmod/core/lib/linux/x86_64/libfmodL.so.13")
 		}
 
 		for src in files_to_copy {
