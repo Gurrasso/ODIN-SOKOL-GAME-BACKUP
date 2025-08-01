@@ -49,6 +49,8 @@ screen_size: Vec2
 frame_count: i32
 dt: f32
 
+last_screen_size: Vec2
+
 init_utils :: proc(){
 	screen_size = Vec2{sapp.widthf(), sapp.heightf()}
 }

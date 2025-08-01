@@ -9,8 +9,6 @@ package main
 	fmod splash screen,
 	make fmod shared objects not have to be exported every build and maybe not have to be included with the bin?,
 
-	make a universal build file for both windows and linux and include sokol and shdc in the project files,
-
 	maybe enums should have all caps,
 
 	look into whether the thing we have for choosing in what direction to move the colliders in the collision resolution is okay, maybe use the min and max values instead,
@@ -107,6 +105,7 @@ import "sound"
 import "scenes"
 import "ui"
 
+
 Spring :: struct{
 	//where the spring is attached
 	anchor: Vec2,
@@ -157,6 +156,8 @@ main :: proc(){
 //initialization
 init_cb :: proc "c" (){
 	context = default_context
+
+	sapp.toggle_fullscreen()
 	
 	//init_icon("./src/assets/sprites/ase256.png")
 
@@ -247,6 +248,8 @@ frame_cb :: proc "c" (){
 
 	game.update_cursor()
 
+	ui.update()
+
 	if events.listen_key_single_down(.M) do scenes.switch_scene("menu")
 	if events.listen_key_single_down(.K) do scenes.switch_scene("game")
 	
@@ -259,6 +262,7 @@ frame_cb :: proc "c" (){
 	sound.update_sound_emitters()
 
 	events.mouse_move = {}
+	utils.last_screen_size = utils.screen_size
 }
 
 //Events

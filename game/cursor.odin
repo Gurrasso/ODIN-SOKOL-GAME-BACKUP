@@ -25,7 +25,7 @@ init_cursor :: proc(){
 	gs.cursor = Cursor{
 		transform = Transform{
 			pos = {1, 0},
-			size = {24, 24}, // in pixels
+			size = {24, 24},
 		},
 		//sensitivity
 		sensitivity = 2,
@@ -42,7 +42,7 @@ init_cursor :: proc(){
 			"",
 			true,
 			false,
-			col.Rect_collider_shape{gs.cursor.world_transform.size},
+			col.Rect_collider_shape{draw.get_pixel_size_in_world(gs.cursor.transform.size, 0)},
 			.Trigger,
 			&gs.cursor.world_transform.pos,
 			&gs.cursor.world_transform.rot.z,

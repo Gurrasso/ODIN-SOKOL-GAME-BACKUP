@@ -103,10 +103,11 @@ init_game_state :: proc(){
 	
 	ui.init_button(button_desc = ui.Button{
 		Transform{
-			size = {1,1},
-			pos = {0,-1},
+			size = {.05,.05},
+			pos = {.05,.1},
 			rot = 0,
 		},
+		{},
 		WHITE_IMAGE_PATH,
 		"",
 		"",

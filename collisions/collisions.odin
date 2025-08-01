@@ -375,6 +375,16 @@ query_collider :: proc(id: Collider_id) -> Collider{
 	return colliders[id]
 }
 
+update_rect_collider_size :: proc(id: Collider_id, size: Vec2){
+	assert(id in colliders)
+	_, ok := colliders[id].shape.(Rect_collider_shape)
+	assert(ok, "Collider given not rect")
+
+	collider := &colliders[id]
+	rect_collider := &collider.shape.(Rect_collider_shape)
+	rect_collider.size = size
+}
+
 default_collider_shape :: proc() -> Collider_shape{
 	return Rect_collider_shape{
 		size = {1, 1}
